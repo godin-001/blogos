@@ -1,0 +1,358 @@
+'use client'
+
+import { useState, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { Sparkles, Check, Copy, Download, Save, ChevronDown, ChevronUp, Loader2 } from 'lucide-react'
+import { callChat } from '@/lib/api'
+
+type Section = {
+  id: string
+  title: string
+  emoji: string
+  description: string
+  placeholder: string
+  tip: string
+}
+
+const SECTIONS: Section[] = [
+  {
+    id: 'titulo',
+    title: 'Título Atractivo',
+    emoji: '🎯',
+    description: 'El título es lo primero que ve tu lector. Debe despertar curiosidad y comunicar el beneficio.',
+    placeholder: 'Escribe un título que nadie pueda ignorar...',
+    tip: 'Usa números (7 formas...), preguntas (¿Por qué...?) o contraste (Lo que nadie dice sobre...)',
+  },
+  {
+    id: 'gancho',
+    title: 'Gancho Inicial',
+    emoji: '🪝',
+    description: 'Las primeras 2-3 oraciones deciden si el lector sigue. Engancha con una historia, dato o pregunta poderosa.',
+    placeholder: 'Comienza con algo que haga al lector decir "¡Necesito leer esto!"...',
+    tip: 'Técnica PAS: Problema → Agitación → Solución. O empieza con una historia real.',
+  },
+  {
+    id: 'subtitulos',
+    title: 'Subtítulos y Estructura',
+    emoji: '📋',
+    description: 'Los subtítulos son el esqueleto de tu artículo. El lector los escanea antes de leer el texto.',
+    placeholder: 'Lista tus subtítulos principales:\n\n1. Por qué...\n2. Cómo...\n3. El error que...\n4. Lo que nadie dice...',
+    tip: 'Cada subtítulo debe poder leerse de forma independiente y generar curiosidad.',
+  },
+  {
+    id: 'ejemplos',
+    title: 'Ejemplos e Historias',
+    emoji: '📖',
+    description: 'Los ejemplos hacen tangible lo abstracto. Las historias crean conexión emocional.',
+    placeholder: 'Escribe las historias o ejemplos que ilustrarán cada punto del artículo...',
+    tip: 'Una historia personal bien contada vale más que 10 estadísticas. Sé específico con los detalles.',
+  },
+  {
+    id: 'reflexion',
+    title: 'Reflexión Final',
+    emoji: '🧠',
+    description: 'El cierre que hace al lector pensar diferente. Aquí está el valor diferencial de tu artículo.',
+    placeholder: 'La conclusión más importante, la perspectiva única, el insight que solo tú puedes dar...',
+    tip: 'Conecta el final con el principio. Cierra el loop que abriste en el gancho.',
+  },
+  {
+    id: 'cta',
+    title: 'Llamado a la Acción (CTA)',
+    emoji: '🚀',
+    description: '¿Qué quieres que haga el lector después de leer? Sé específico y da una sola instrucción.',
+    placeholder: 'Ej: Comparte este artículo con alguien que lo necesite / Suscríbete para recibir más contenido como este...',
+    tip: 'Un CTA claro y específico convierte 3x más que uno genérico. Usa verbos de acción.',
+  },
+]
+
+type Article = {
+  id: string
+  titulo: string
+  gancho: string
+  subtitulos: string
+  ejemplos: string
+  reflexion: string
+  cta: string
+  createdAt: string
+}
+
+function ArticuloContent() {
+  const searchParams = useSearchParams()
+  const ideaParam = searchParams.get('idea') || ''
+
+  const [content, setContent] = useState<Record<string, string>>({
+    titulo: ideaParam,
+    gancho: '',
+    subtitulos: '',
+    ejemplos: '',
+    reflexion: '',
+    cta: '',
+  })
+  const [activeSection, setActiveSection] = useState(0)
+  const [aiLoading, setAiLoading] = useState<Record<string, boolean>>({})
+  const [profile, setProfile] = useState<Record<string, string> | null>(null)
+  const [saved, setSaved] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [showPreview, setShowPreview] = useState(false)
+
+  useEffect(() => {
+    const p = localStorage.getItem('blogos_profile')
+    if (p) setProfile(JSON.parse(p))
+  }, [])
+
+  const completedSections = SECTIONS.filter(s => content[s.id]?.trim().length > 0).length
+  const progress = (completedSections / SECTIONS.length) * 100
+
+  const generateWithAI = async (sectionId: string) => {
+    setAiLoading(prev => ({ ...prev, [sectionId]: true }))
+    try {
+      const contextMsg = `Artículo: "${content.titulo || 'Sin título aún'}"
+Nicho: ${profile?.niche || 'general'}
+Sección a generar: ${sectionId}
+Contexto del artículo:
+- Título: ${content.titulo}
+- Gancho: ${content.gancho}
+- Subtítulos: ${content.subtitulos}
+
+Genera contenido de alta calidad para la sección "${sectionId}".
+Máximo 200 palabras. Estilo: ${profile?.style || 'profesional pero cercano'}.
+Solo el contenido de la sección, sin explicaciones adicionales.`
+
+      const data = await callChat({
+        mode: 'estructura',
+        profile,
+        messages: [{ role: 'user', content: contextMsg }],
+      })
+
+      if (data.text) {
+        setContent(prev => ({ ...prev, [sectionId]: data.text.trim() }))
+      } else if (data.needsKey) {
+        alert('Agrega tu API key de Anthropic en Configuración → APIs para usar la generación con IA.')
+      }
+    } catch {
+      alert('Error al generar. Verifica tu API key en Configuración → APIs.')
+    }
+    setAiLoading(prev => ({ ...prev, [sectionId]: false }))
+  }
+
+  const saveArticle = () => {
+    const articles = JSON.parse(localStorage.getItem('blogos_articles') || '[]')
+    const article: Article = {
+      id: `art-${Date.now()}`,
+      ...content as Omit<Article, 'id' | 'createdAt'>,
+      createdAt: new Date().toISOString(),
+    }
+    articles.push(article)
+    localStorage.setItem('blogos_articles', JSON.stringify(articles))
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
+  }
+
+  const copyAll = () => {
+    const full = `# ${content.titulo}\n\n${content.gancho}\n\n${content.subtitulos}\n\n${content.ejemplos}\n\n---\n\n${content.reflexion}\n\n**${content.cta}**`
+    navigator.clipboard.writeText(full)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  const downloadMarkdown = () => {
+    const full = `# ${content.titulo}\n\n${content.gancho}\n\n${content.subtitulos}\n\n${content.ejemplos}\n\n---\n\n${content.reflexion}\n\n**CTA: ${content.cta}**`
+    const blob = new Blob([full], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${content.titulo?.slice(0, 30) || 'articulo'}.md`
+    a.click()
+  }
+
+  return (
+    <div className="animate-fade-in">
+      {/* Header */}
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ fontSize: 26, fontWeight: 800, color: 'var(--text)' }}>✍️ Nuevo Artículo</h1>
+        <p style={{ color: 'var(--text-muted)', fontSize: 14, marginTop: 6 }}>
+          Metodología BlogOS — 6 secciones para un artículo de alto nivel
+        </p>
+      </div>
+
+      {/* Progress */}
+      <div className="card" style={{ padding: '16px 20px', marginBottom: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
+            Progreso del artículo
+          </span>
+          <span style={{ fontSize: 13, color: completedSections === 6 ? '#34d399' : '#a78bfa' }}>
+            {completedSections}/6 secciones {completedSections === 6 ? '✅ Completo' : ''}
+          </span>
+        </div>
+        <div className="progress-bar">
+          <div className="progress-bar-fill" style={{ width: `${progress}%` }} />
+        </div>
+        <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+          {SECTIONS.map(s => (
+            <span key={s.id} style={{
+              fontSize: 11, padding: '2px 8px', borderRadius: 12,
+              background: content[s.id]?.trim() ? 'rgba(16,185,129,0.15)' : 'var(--bg-base)',
+              border: `1px solid ${content[s.id]?.trim() ? 'rgba(16,185,129,0.3)' : 'var(--border-light)'}`,
+              color: content[s.id]?.trim() ? '#34d399' : 'var(--text-muted)',
+            }}>
+              {content[s.id]?.trim() ? '✓' : '○'} {s.emoji} {s.title}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
+        <button className="btn-primary" onClick={saveArticle} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {saved ? <Check size={15} /> : <Save size={15} />}
+          {saved ? 'Guardado!' : 'Guardar'}
+        </button>
+        <button className="btn-secondary" onClick={copyAll} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {copied ? <Check size={15} /> : <Copy size={15} />}
+          {copied ? 'Copiado!' : 'Copiar todo'}
+        </button>
+        <button className="btn-secondary" onClick={downloadMarkdown} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Download size={15} />
+          Descargar .md
+        </button>
+        <button
+          className="btn-secondary"
+          onClick={() => setShowPreview(!showPreview)}
+          style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+        >
+          {showPreview ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+          {showPreview ? 'Ocultar preview' : 'Ver preview'}
+        </button>
+      </div>
+
+      {/* Preview */}
+      {showPreview && (
+        <div className="card" style={{ padding: '20px 24px', marginBottom: 20 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', marginBottom: 12 }}>
+            {content.titulo || '(Sin título)'}
+          </h2>
+          {content.gancho && <p style={{ color: 'var(--text-muted)', lineHeight: 1.7, marginBottom: 12, fontSize: 14, borderLeft: '3px solid #7c3aed', paddingLeft: 12 }}>{content.gancho}</p>}
+          {content.subtitulos && <pre style={{ color: 'var(--text)', fontSize: 13, whiteSpace: 'pre-wrap', marginBottom: 12 }}>{content.subtitulos}</pre>}
+          {content.ejemplos && <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.7, marginBottom: 12 }}>{content.ejemplos}</p>}
+          {content.reflexion && <p style={{ color: 'var(--text)', fontSize: 13, lineHeight: 1.7, fontStyle: 'italic', marginBottom: 12 }}>💭 {content.reflexion}</p>}
+          {content.cta && <div style={{ padding: '12px 16px', background: 'rgba(124,58,237,0.1)', borderRadius: 8, color: '#a78bfa', fontSize: 13, fontWeight: 600 }}>🚀 {content.cta}</div>}
+        </div>
+      )}
+
+      {/* Sections */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {SECTIONS.map((section, index) => (
+          <div key={section.id} className="card" style={{
+            border: activeSection === index ? '1px solid #7c3aed' : '1px solid var(--border)',
+            transition: 'all 0.2s'
+          }}>
+            <div
+              style={{ padding: '16px 20px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+              onClick={() => setActiveSection(activeSection === index ? -1 : index)}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: '50%',
+                  background: content[section.id]?.trim() ? 'rgba(16,185,129,0.2)' : 'var(--bg-base)',
+                  border: `1px solid ${content[section.id]?.trim() ? 'rgba(16,185,129,0.4)' : 'var(--border-light)'}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 14
+                }}>
+                  {content[section.id]?.trim() ? '✓' : section.emoji}
+                </div>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>
+                    {index + 1}. {section.title}
+                  </div>
+                  {content[section.id]?.trim() && activeSection !== index && (
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2, maxWidth: 400 }}>
+                      {content[section.id].slice(0, 80)}...
+                    </div>
+                  )}
+                </div>
+              </div>
+              {activeSection === index ? <ChevronUp size={18} color="var(--text-muted)" /> : <ChevronDown size={18} color="var(--text-muted)" />}
+            </div>
+
+            {activeSection === index && (
+              <div style={{ padding: '0 20px 20px' }}>
+                <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12, lineHeight: 1.5 }}>
+                  {section.description}
+                </p>
+                <div style={{
+                  padding: '10px 12px', background: 'rgba(245,158,11,0.08)',
+                  border: '1px solid rgba(245,158,11,0.2)', borderRadius: 8, marginBottom: 12
+                }}>
+                  <div style={{ fontSize: 11, color: '#fbbf24', fontWeight: 700, marginBottom: 3 }}>💡 TIP</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{section.tip}</div>
+                </div>
+                <textarea
+                  className="textarea-field"
+                  placeholder={section.placeholder}
+                  value={content[section.id]}
+                  onChange={e => setContent(prev => ({ ...prev, [section.id]: e.target.value }))}
+                  style={{ minHeight: section.id === 'subtitulos' || section.id === 'ejemplos' ? 160 : 120 }}
+                />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                    {content[section.id]?.length || 0} caracteres
+                  </span>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      className="btn-secondary"
+                      onClick={() => generateWithAI(section.id)}
+                      disabled={aiLoading[section.id] || (!content.titulo && section.id !== 'titulo')}
+                      style={{ fontSize: 12, padding: '7px 14px', display: 'flex', alignItems: 'center', gap: 6 }}
+                    >
+                      {aiLoading[section.id] ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : (
+                        <Sparkles size={14} />
+                      )}
+                      {aiLoading[section.id] ? 'Generando...' : 'Generar con IA'}
+                    </button>
+                    {index < SECTIONS.length - 1 && content[section.id]?.trim() && (
+                      <button
+                        className="btn-primary"
+                        onClick={() => setActiveSection(index + 1)}
+                        style={{ fontSize: 12, padding: '7px 14px' }}
+                      >
+                        Siguiente →
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Completed */}
+      {completedSections === 6 && (
+        <div style={{
+          marginTop: 20, padding: '16px 20px',
+          background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)',
+          borderRadius: 10, textAlign: 'center'
+        }}>
+          <div style={{ fontSize: 24, marginBottom: 8 }}>🎉</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: '#34d399', marginBottom: 4 }}>
+            ¡Artículo completo!
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+            Guárdalo, cópialo o descárgalo. ¡Listo para publicar!
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default function ArticuloPage() {
+  return (
+    <Suspense fallback={<div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>Cargando...</div>}>
+      <ArticuloContent />
+    </Suspense>
+  )
+}
