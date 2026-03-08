@@ -168,8 +168,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {/* Main content */}
           <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
             {/* Mobile header */}
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            <div className="mobile-header" style={{
+              alignItems: 'center', justifyContent: 'space-between',
               padding: '16px 20px', borderBottom: '1px solid var(--border)',
               background: 'var(--bg-card)',
               position: 'sticky', top: 0, zIndex: 30,
@@ -190,15 +190,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </main>
         </div>
 
-        <style jsx global>{`
-          @media (min-width: 768px) {
-            .lg-sidebar { left: 0 !important; }
-            .desktop-spacer { display: block; }
-          }
-          @media (max-width: 767px) {
-            .desktop-spacer { display: none; }
-          }
-        `}</style>
+        {/* media queries en globals.css */}
       </body>
     </html>
   )

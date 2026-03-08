@@ -283,3 +283,15 @@ html, body {
 }
 
 /* fin de aliases */
+
+/* ── Layout responsive ─────────────────────────────────────────── */
+/* Mobile: sidebar oculto, header visible */
+.lg-sidebar    { left: -250px; }
+.desktop-spacer{ display: none; }
+.mobile-header { display: flex; }
+
+@media (min-width: 768px) {
+  .lg-sidebar     { left: 0 !important; }
+  .desktop-spacer { display: block !important; }
+  .mobile-header  { display: none !important; }
+}
