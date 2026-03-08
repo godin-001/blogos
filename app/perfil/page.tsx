@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { Save, Check, Trash2, RotateCcw } from 'lucide-react'
-import { useRouter } from 'next/navigation'
 
 const STYLES = [
   { id: 'informal', label: 'Informal y cercano', emoji: '😊' },
@@ -26,7 +25,6 @@ const FREQUENCIES = [
 ]
 
 export default function PerfilPage() {
-  const router = useRouter()
   const [profile, setProfile] = useState({
     name: '',
     niche: '',
@@ -39,6 +37,7 @@ export default function PerfilPage() {
   })
   const [saved, setSaved] = useState(false)
   const [stats, setStats] = useState({ ideas: 0, articles: 0, calEntries: 0 })
+  const [confirmReset, setConfirmReset] = useState(false)
 
   useEffect(() => {
     const saved = localStorage.getItem('blogos_profile')
@@ -56,9 +55,9 @@ export default function PerfilPage() {
   }
 
   const resetAll = () => {
-    if (!confirm('¿Borrar todos los datos? Esto no se puede deshacer.')) return
     localStorage.clear()
-    router.push('/onboarding')
+    setConfirmReset(false)
+    window.location.href = '/onboarding'
   }
 
   return (
