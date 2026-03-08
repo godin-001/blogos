@@ -7,19 +7,25 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Lightbulb, HelpCircle,
   Calendar, DollarSign, Settings, Pen, Menu, X,
-  Sparkles, TrendingUp, Key
+  Sparkles, TrendingUp, Key, Star, Network,
+  Anchor, Share2, BarChart2
 } from 'lucide-react'
 
 const navItems = [
-  { href: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { href: '/ideas', icon: Lightbulb, label: 'Ideas' },
-  { href: '/articulo', icon: Pen, label: 'Nuevo Artículo' },
-  { href: '/preguntas', icon: HelpCircle, label: 'Sesión Reflexiva' },
-  { href: '/seo', icon: TrendingUp, label: 'SEO & Copy' },
-  { href: '/calendario', icon: Calendar, label: 'Calendario' },
-  { href: '/monetizacion', icon: DollarSign, label: 'Monetización' },
-  { href: '/perfil', icon: Settings, label: 'Mi Perfil' },
-  { href: '/configuracion', icon: Key, label: 'APIs' },
+  { href: '/', icon: LayoutDashboard, label: 'Dashboard', group: 'main' },
+  { href: '/ideas', icon: Lightbulb, label: 'Ideas', group: 'main' },
+  { href: '/articulo', icon: Pen, label: 'Nuevo Artículo', group: 'main' },
+  { href: '/preguntas', icon: HelpCircle, label: 'Sesión Reflexiva', group: 'main' },
+  { href: '/seo', icon: TrendingUp, label: 'SEO & Copy', group: 'main' },
+  { href: '/calendario', icon: Calendar, label: 'Calendario', group: 'main' },
+  { href: '/monetizacion', icon: DollarSign, label: 'Monetización', group: 'main' },
+  { href: '/scorecard', icon: Star, label: 'Scorecard APEX', group: 'pro', badge: 'PRO' },
+  { href: '/clusters', icon: Network, label: 'Topic Clusters', group: 'pro', badge: 'PRO' },
+  { href: '/hooks', icon: Anchor, label: 'Generador de Hooks', group: 'pro', badge: 'PRO' },
+  { href: '/distribucion', icon: Share2, label: 'Distribución', group: 'pro', badge: 'PRO' },
+  { href: '/growth', icon: BarChart2, label: 'Growth Log', group: 'pro', badge: 'PRO' },
+  { href: '/perfil', icon: Settings, label: 'Mi Perfil', group: 'config' },
+  { href: '/configuracion', icon: Key, label: 'APIs', group: 'config' },
 ]
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -105,17 +111,39 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </div>
 
             {/* Nav */}
-            <nav style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
-              {navItems.map(({ href, icon: Icon, label }) => (
-                <Link
-                  key={href}
-                  href={href}
-                  className={`sidebar-item ${pathname === href ? 'active' : ''}`}
-                  onClick={() => setMobileOpen(false)}
-                >
-                  <Icon size={18} />
-                  {label}
-                </Link>
+            <nav style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
+              {['main','pro','config'].map(group => (
+                <div key={group}>
+                  {group === 'pro' && (
+                    <div style={{ fontSize: 10, fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '12px 8px 4px' }}>
+                      ⚡ Herramientas PRO
+                    </div>
+                  )}
+                  {group === 'config' && (
+                    <div style={{ borderTop: '1px solid var(--border)', marginTop: 8, paddingTop: 8 }} />
+                  )}
+                  {navItems.filter(n => n.group === group).map(({ href, icon: Icon, label, badge }) => (
+                    <Link
+                      key={href}
+                      href={href}
+                      className={`sidebar-item ${pathname === href ? 'active' : ''}`}
+                      onClick={() => setMobileOpen(false)}
+                      style={{ justifyContent: 'space-between' }}
+                    >
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <Icon size={17} />
+                        <span style={{ fontSize: 13 }}>{label}</span>
+                      </span>
+                      {badge && (
+                        <span style={{
+                          fontSize: 9, fontWeight: 700, padding: '2px 6px',
+                          borderRadius: 4, background: 'linear-gradient(135deg,#7c3aed,#06b6d4)',
+                          color: 'white', letterSpacing: '0.05em'
+                        }}>{badge}</span>
+                      )}
+                    </Link>
+                  ))}
+                </div>
               ))}
             </nav>
 
