@@ -264,7 +264,30 @@ export default function Onboarding() {
         </div>
       </div>
 
-      <p style={{ marginTop: 20, fontSize: 12, color: 'var(--text-muted)' }}>
+      <button
+        onClick={() => {
+          // Saltar onboarding — usar perfil demo y entrar directo
+          const demo = {
+            name: 'Blogger',
+            niche: 'Marketing Digital',
+            audience: 'emprendedores LATAM',
+            style: 'informal',
+            goal: 'trafico',
+            createdAt: new Date().toISOString(),
+          }
+          localStorage.setItem('blogos_profile', JSON.stringify(demo))
+          router.push('/')
+        }}
+        style={{
+          marginTop: 16, fontSize: 12, color: 'var(--text-muted)',
+          background: 'none', border: 'none', cursor: 'pointer',
+          textDecoration: 'underline',
+        }}
+      >
+        Saltar configuración → Entrar con perfil demo
+      </button>
+
+      <p style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)' }}>
         Puedes cambiar esto en cualquier momento desde tu perfil
       </p>
     </div>
