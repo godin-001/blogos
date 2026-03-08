@@ -1,249 +1,314 @@
 'use client'
-import { useState, useEffect } from 'react'
 
-interface ClusterArticle {
-  id: string; title: string; keyword: string; status: 'pendiente'|'borrador'|'publicado'; type: string
-}
-interface Pillar {
-  id: string; title: string; keyword: string; description: string
-  clusters: ClusterArticle[]
-}
+import { useState } from 'react'
+import { Network, Loader2, Plus, Trash2 } from 'lucide-react'
+import { callChat, getStoredKeys, getProfile } from '@/lib/api'
 
-const TYPES = ['Evergreen','Tutorial','Storytelling','Contrarian','Trending','Pillar']
-const STATUSES: Record<string, { label: string; color: string; bg: string }> = {
-  pendiente:  { label: 'Pendiente',  color: '#64748b', bg: 'rgba(100,116,139,.15)' },
-  borrador:   { label: 'Borrador',   color: '#f59e0b', bg: 'rgba(245,158,11,.15)'  },
-  publicado:  { label: 'Publicado',  color: '#10b981', bg: 'rgba(16,185,129,.15)'  },
+interface Cluster {
+  pillar: {
+    titulo: string
+    keyword: string
+    intencion: string
+    palabras: string
+  }
+  subtemas: Array<{
+    titulo: string
+    keyword: string
+    angulo: string
+    linkInterno: string
+  }>
+  estrategia: string
+  frecuencia: string
 }
-
-const STORAGE_KEY = 'blogos_clusters'
 
 export default function ClustersPage() {
-  const [pillars, setPillars] = useState<Pillar[]>([])
-  const [expanded, setExpanded] = useState<string|null>(null)
-  const [showNewPillar, setShowNewPillar] = useState(false)
-  const [newPillar, setNewPillar] = useState({ title: '', keyword: '', description: '' })
-  const [newArticles, setNewArticles] = useState<Record<string, { title: string; keyword: string; type: string }>>({})
-
-  useEffect(() => {
-    const d = localStorage.getItem(STORAGE_KEY)
-    if (d) setPillars(JSON.parse(d))
-  }, [])
-
-  const save = (p: Pillar[]) => {
-    setPillars(p)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(p))
-  }
-
-  const addPillar = () => {
-    if (!newPillar.title) return
-    const p: Pillar = {
-      id: Date.now().toString(),
-      ...newPillar,
-      clusters: [],
+  const [topico, setTopico] = useState('')
+  const [nivel, setNivel] = useState('intermedio')
+  const [loading, setLoading] = useState(false)
+  const [cluster, setCluster] = useState<Cluster | null>(null)
+  const [savedClusters, setSavedClusters] = useState<Cluster[]>(() => {
+    if (typeof window !== 'undefined') {
+      const s = localStorage.getItem('blogos_clusters')
+      return s ? JSON.parse(s) : []
     }
-    save([...pillars, p])
-    setNewPillar({ title: '', keyword: '', description: '' })
-    setShowNewPillar(false)
-    setExpanded(p.id)
-  }
+    return []
+  })
 
-  const addArticle = (pillarId: string) => {
-    const na = newArticles[pillarId]
-    if (!na?.title) return
-    const art: ClusterArticle = {
-      id: Date.now().toString(),
-      title: na.title, keyword: na.keyword || '', type: na.type || 'Evergreen', status: 'pendiente',
+  async function generar() {
+    if (!topico.trim()) return
+    setLoading(true)
+    setCluster(null)
+
+    const profile = getProfile()
+    const keys = getStoredKeys()
+
+    const prompt = `Eres un estratega de contenido de nivel mundial. Diseña una arquitectura de Topic Cluster completa para el tema "${topico}".
+
+Audiencia: ${profile?.audience || 'emprendedores LATAM'}
+Nicho: ${profile?.niche || 'Marketing digital'}
+Nivel del blogger: ${nivel}
+
+Responde SOLO en JSON válido con este formato:
+{
+  "pillar": {
+    "titulo": "Título del artículo pilar (página principal del cluster)",
+    "keyword": "keyword principal de cola corta",
+    "intencion": "informacional|transaccional|navegacional",
+    "palabras": "2500-3500"
+  },
+  "subtemas": [
+    {
+      "titulo": "Título de artículo cluster 1",
+      "keyword": "long-tail keyword específica",
+      "angulo": "ángulo único o perspectiva del artículo",
+      "linkInterno": "hacia qué sección del pilar enlaza"
     }
-    const updated = pillars.map(p => p.id === pillarId ? { ...p, clusters: [...p.clusters, art] } : p)
-    save(updated)
-    setNewArticles(prev => ({ ...prev, [pillarId]: { title: '', keyword: '', type: 'Evergreen' } }))
+  ],
+  "estrategia": "Cómo publicar y enlazar estos artículos en 2-3 oraciones estratégicas",
+  "frecuencia": "Plan de publicación: cuándo publicar cada uno"
+}
+
+Genera exactamente 6 artículos cluster (subtemas). Hazlos específicos, útiles y con clara intención de búsqueda.`
+
+    try {
+      const res = await callChat([{ role: 'user', content: prompt }], keys.anthropic)
+      const json = JSON.parse(res.match(/\{[\s\S]*\}/)?.[0] || '{}')
+      if (json.pillar) setCluster(json)
+    } catch {
+      setCluster({
+        pillar: {
+          titulo: `Guía definitiva: ${topico} para emprendedores LATAM`,
+          keyword: topico.toLowerCase(),
+          intencion: 'informacional',
+          palabras: '2500-3500',
+        },
+        subtemas: [
+          { titulo: `¿Qué es ${topico}? Explicado sin tecnicismos`, keyword: `${topico} qué es`, angulo: 'Para principiantes absolutos que necesitan la base', linkInterno: 'Sección: Fundamentos' },
+          { titulo: `Cómo empezar con ${topico} en 7 días (sin experiencia previa)`, keyword: `cómo empezar ${topico}`, angulo: 'Plan de acción paso a paso para nuevos bloggers', linkInterno: 'Sección: Primeros pasos' },
+          { titulo: `Los 5 errores de ${topico} que destruyen tu tráfico`, keyword: `errores ${topico}`, angulo: 'Perspectiva negativa-positiva: qué NO hacer', linkInterno: 'Sección: Errores comunes' },
+          { titulo: `Herramientas de ${topico}: cuál usar según tu presupuesto`, keyword: `herramientas ${topico}`, angulo: 'Comparativa por precio y funcionalidad', linkInterno: 'Sección: Herramientas' },
+          { titulo: `Casos reales: bloggers que dominaron ${topico} desde cero`, keyword: `casos de éxito ${topico}`, angulo: 'Historias reales con números y resultados', linkInterno: 'Sección: Casos de estudio' },
+          { titulo: `${topico} avanzado: estrategias para escalar resultados x10`, keyword: `${topico} avanzado estrategias`, angulo: 'Para quien ya tiene bases y quiere multiplicar', linkInterno: 'Sección: Estrategia avanzada' },
+        ],
+        estrategia: `Publica primero el artículo pilar (el más completo), luego los 6 clusters en orden de profundidad. Cada cluster debe enlazar internamente al pilar y al menos 2 otros clusters temáticamente relacionados. Esto crea una red de autoridad que Google recompensa con rankings más altos.`,
+        frecuencia: `Semana 1: Artículo pilar. Semanas 2-4: 2 clusters/semana. Resultado: cluster completo en 4 semanas con 3-4 artículos al mes.`
+      })
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const updateStatus = (pillarId: string, artId: string, status: ClusterArticle['status']) => {
-    const updated = pillars.map(p =>
-      p.id !== pillarId ? p : {
-        ...p, clusters: p.clusters.map(a => a.id === artId ? { ...a, status } : a),
-      }
-    )
-    save(updated)
+  function guardar() {
+    if (!cluster) return
+    const updated = [cluster, ...savedClusters].slice(0, 10)
+    setSavedClusters(updated)
+    localStorage.setItem('blogos_clusters', JSON.stringify(updated))
   }
 
-  const deletePillar = (id: string) => save(pillars.filter(p => p.id !== id))
-  const deleteArticle = (pId: string, aId: string) => {
-    save(pillars.map(p => p.id !== pId ? p : { ...p, clusters: p.clusters.filter(a => a.id !== aId) }))
+  function eliminar(i: number) {
+    const updated = savedClusters.filter((_, idx) => idx !== i)
+    setSavedClusters(updated)
+    localStorage.setItem('blogos_clusters', JSON.stringify(updated))
   }
-
-  const totalPublished = pillars.reduce((acc, p) => acc + p.clusters.filter(a => a.status === 'publicado').length, 0)
-  const totalArticles  = pillars.reduce((acc, p) => acc + p.clusters.length, 0)
 
   return (
     <div>
-      <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 8 }}>🕸 Topic Clusters</h1>
-        <p style={{ color: 'var(--text-muted)', fontSize: 15 }}>
-          Arquitectura de autoridad: Pillar Pages (3000-5000 palabras) + 10-15 artículos cluster. Domina temas enteros, no keywords aisladas.
-        </p>
+      {/* Header */}
+      <div style={{ marginBottom: 32 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+          <div style={{
+            width: 44, height: 44, borderRadius: 12,
+            background: 'linear-gradient(135deg, #06b6d4, #3b82f6)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+            <Network size={22} color="white" />
+          </div>
+          <div>
+            <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--text)', margin: 0 }}>Topic Clusters</h1>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>Arquitectura de contenido que domina nichos completos en Google</p>
+          </div>
+        </div>
       </div>
 
-      {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 24 }}>
+      {/* Explicación rápida */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24
+      }}>
         {[
-          { label: 'Pillar Pages', val: pillars.length, color: '#7c3aed' },
-          { label: 'Total artículos', val: totalArticles, color: '#06b6d4' },
-          { label: 'Publicados', val: totalPublished, color: '#10b981' },
-          { label: 'Completado', val: totalArticles ? `${Math.round(totalPublished/totalArticles*100)}%` : '0%', color: '#f59e0b' },
-        ].map(s => (
-          <div key={s.label} style={{
-            padding: '16px', borderRadius: 12, background: 'var(--bg-card)',
-            border: '1px solid var(--border)', textAlign: 'center',
-          }}>
-            <div style={{ fontSize: 24, fontWeight: 900, color: s.color }}>{s.val}</div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{s.label}</div>
+          { icon: '🏛️', title: 'Artículo Pilar', desc: 'El hub principal que cubre el tema a fondo (2500+ palabras)' },
+          { icon: '🔗', title: '6 Artículos Cluster', desc: 'Subtemas específicos que enlazan al pilar desde distintos ángulos' },
+          { icon: '📈', title: 'Autoridad total', desc: 'Google ve el conjunto y te posiciona como referente del nicho' },
+        ].map(item => (
+          <div key={item.title} className="card" style={{ textAlign: 'center', padding: '16px 12px' }}>
+            <div style={{ fontSize: 24, marginBottom: 6 }}>{item.icon}</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>{item.title}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5 }}>{item.desc}</div>
           </div>
         ))}
       </div>
 
-      {/* New pillar */}
-      <button onClick={() => setShowNewPillar(!showNewPillar)}
-        style={{
-          marginBottom: 20, padding: '10px 20px', borderRadius: 10, border: 'none',
-          background: 'linear-gradient(135deg,#7c3aed,#06b6d4)', color: 'white',
-          fontWeight: 700, fontSize: 14, cursor: 'pointer',
-        }}>
-        + Nueva Pillar Page
-      </button>
+      {/* Input */}
+      <div className="card" style={{ marginBottom: 24 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>
+              TEMA PRINCIPAL *
+            </label>
+            <input
+              className="input"
+              value={topico}
+              onChange={e => setTopico(e.target.value)}
+              placeholder="Ej: email marketing, productividad, finanzas personales"
+              onKeyDown={e => e.key === 'Enter' && generar()}
+            />
+          </div>
 
-      {showNewPillar && (
-        <div style={{
-          padding: 20, borderRadius: 14, background: 'var(--bg-card)',
-          border: '1px solid #7c3aed44', marginBottom: 20,
-        }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-            <input placeholder="Título de la Pillar Page *"
-              value={newPillar.title} onChange={e => setNewPillar(p => ({ ...p, title: e.target.value }))}
-              style={{ padding: '10px 14px', borderRadius: 8, background: 'var(--bg-base)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 14 }} />
-            <input placeholder="Keyword principal"
-              value={newPillar.keyword} onChange={e => setNewPillar(p => ({ ...p, keyword: e.target.value }))}
-              style={{ padding: '10px 14px', borderRadius: 8, background: 'var(--bg-base)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 14 }} />
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>
+              NIVEL DE PROFUNDIDAD
+            </label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {['principiante', 'intermedio', 'avanzado'].map(l => (
+                <button
+                  key={l}
+                  onClick={() => setNivel(l)}
+                  style={{
+                    padding: '6px 16px', borderRadius: 8, border: '1px solid',
+                    borderColor: nivel === l ? '#7c3aed' : 'var(--border)',
+                    background: nivel === l ? 'rgba(124,58,237,0.15)' : 'transparent',
+                    color: nivel === l ? '#a78bfa' : 'var(--text-muted)',
+                    cursor: 'pointer', fontSize: 13, fontWeight: nivel === l ? 600 : 400,
+                    textTransform: 'capitalize',
+                  }}
+                >
+                  {l}
+                </button>
+              ))}
+            </div>
           </div>
-          <input placeholder="Descripción del tema que cubre esta pillar page"
-            value={newPillar.description} onChange={e => setNewPillar(p => ({ ...p, description: e.target.value }))}
-            style={{ width: '100%', padding: '10px 14px', borderRadius: 8, background: 'var(--bg-base)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 14, marginBottom: 12 }} />
+
+          <button
+            className="btn btn-primary"
+            onClick={generar}
+            disabled={loading || !topico.trim()}
+            style={{ alignSelf: 'flex-start' }}
+          >
+            {loading ? <><Loader2 size={16} className="spin" /> Diseñando arquitectura...</> : '🏗️ Generar Topic Cluster'}
+          </button>
+        </div>
+      </div>
+
+      {/* Result */}
+      {cluster && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+          {/* Pillar */}
+          <div className="card" style={{
+            background: 'linear-gradient(135deg, rgba(6,182,212,0.08), rgba(59,130,246,0.05))',
+            border: '1px solid rgba(6,182,212,0.3)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <span style={{
+                fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 4,
+                background: '#06b6d4', color: 'white', textTransform: 'uppercase', letterSpacing: '0.06em'
+              }}>Artículo Pilar 🏛️</span>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{cluster.pillar.palabras} palabras · {cluster.pillar.intencion}</span>
+            </div>
+            <h3 style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', margin: '0 0 8px' }}>
+              {cluster.pillar.titulo}
+            </h3>
+            <div style={{
+              display: 'inline-block', fontSize: 12, padding: '3px 10px',
+              background: 'rgba(6,182,212,0.15)', borderRadius: 6, color: '#06b6d4'
+            }}>
+              🔑 {cluster.pillar.keyword}
+            </div>
+          </div>
+
+          {/* Subtemas */}
+          <div>
+            <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>
+              Artículos Cluster <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(enlazados al pilar)</span>
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {cluster.subtemas.map((s, i) => (
+                <div key={i} className="card" style={{ padding: '14px 16px' }}>
+                  <div style={{ display: 'flex', gap: 12 }}>
+                    <div style={{
+                      width: 28, height: 28, borderRadius: 8,
+                      background: 'linear-gradient(135deg, #7c3aed, #06b6d4)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      flexShrink: 0, fontSize: 12, fontWeight: 700, color: 'white'
+                    }}>{i + 1}</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)', marginBottom: 4 }}>{s.titulo}</div>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 11, color: '#a78bfa' }}>🔑 {s.keyword}</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>·</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>🎯 {s.angulo}</span>
+                      </div>
+                      <div style={{ fontSize: 11, color: '#06b6d4', marginTop: 4 }}>🔗 Enlaza a: {s.linkInterno}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Estrategia */}
+          <div className="card" style={{
+            background: 'rgba(245,158,11,0.06)',
+            border: '1px solid rgba(245,158,11,0.2)',
+          }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+              📋 Estrategia de publicación
+            </div>
+            <p style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.6, margin: '0 0 8px' }}>{cluster.estrategia}</p>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>⏰ {cluster.frecuencia}</p>
+          </div>
+
+          {/* Actions */}
           <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={addPillar}
-              style={{ padding: '9px 20px', borderRadius: 8, border: 'none', background: '#7c3aed', color: 'white', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
-              Crear Pillar Page
+            <button className="btn btn-primary" onClick={guardar}>
+              <Plus size={14} /> Guardar cluster
             </button>
-            <button onClick={() => setShowNewPillar(false)}
-              style={{ padding: '9px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 13 }}>
-              Cancelar
-            </button>
+            <a href="/calendario" className="btn btn-secondary" style={{ textDecoration: 'none' }}>
+              📅 Agendar en calendario →
+            </a>
           </div>
+
         </div>
       )}
 
-      {/* Pillars */}
-      {pillars.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-muted)' }}>
-          <div style={{ fontSize: 48, marginBottom: 12 }}>🕸</div>
-          <div style={{ fontWeight: 600, marginBottom: 6 }}>Sin clusters todavía</div>
-          <div style={{ fontSize: 14 }}>Crea tu primera Pillar Page y agrega 10-15 artículos cluster debajo.</div>
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {pillars.map(p => {
-            const pubs = p.clusters.filter(a => a.status === 'publicado').length
-            const pct  = p.clusters.length ? Math.round(pubs / p.clusters.length * 100) : 0
-            return (
-              <div key={p.id} style={{ borderRadius: 16, background: 'var(--bg-card)', border: '1px solid var(--border)', overflow: 'hidden' }}>
-                {/* Pillar header */}
-                <div
-                  onClick={() => setExpanded(expanded === p.id ? null : p.id)}
-                  style={{
-                    padding: '18px 20px', cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
-                    borderBottom: expanded === p.id ? '1px solid var(--border)' : 'none',
-                  }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-                      <span style={{
-                        fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 4,
-                        background: 'rgba(124,58,237,.2)', color: '#a78bfa',
-                      }}>PILLAR</span>
-                      <span style={{ fontWeight: 700, fontSize: 15 }}>{p.title}</span>
-                    </div>
-                    {p.keyword && <div style={{ fontSize: 12, color: '#7c3aed' }}>🔑 {p.keyword}</div>}
-                    {p.description && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{p.description}</div>}
-                  </div>
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 6 }}>
-                      {pubs}/{p.clusters.length} publicados
-                    </div>
-                    <div style={{ width: 100, height: 6, borderRadius: 3, background: 'var(--border)' }}>
-                      <div style={{ height: '100%', borderRadius: 3, width: `${pct}%`, background: 'linear-gradient(135deg,#7c3aed,#06b6d4)' }} />
-                    </div>
-                  </div>
-                  <span style={{ color: 'var(--text-muted)', fontSize: 18 }}>{expanded === p.id ? '▲' : '▼'}</span>
-                  <button onClick={e => { e.stopPropagation(); deletePillar(p.id) }}
-                    style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 16, padding: '0 4px' }}>×</button>
+      {/* Saved */}
+      {savedClusters.length > 0 && (
+        <div style={{ marginTop: 32 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>
+            Clusters guardados ({savedClusters.length})
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {savedClusters.map((c, i) => (
+              <div key={i} className="card" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{ fontSize: 20 }}>🏛️</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{c.pillar.titulo}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{c.subtemas.length} artículos cluster</div>
                 </div>
-
-                {expanded === p.id && (
-                  <div style={{ padding: 20 }}>
-                    {/* Articles list */}
-                    {p.clusters.map(a => (
-                      <div key={a.id} style={{
-                        display: 'flex', alignItems: 'center', gap: 10,
-                        padding: '10px 12px', borderRadius: 8, marginBottom: 6,
-                        background: 'var(--bg-base)', border: '1px solid var(--border)',
-                      }}>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600 }}>{a.title}</div>
-                          {a.keyword && <div style={{ fontSize: 11, color: '#7c3aed', marginTop: 2 }}>🔑 {a.keyword}</div>}
-                        </div>
-                        <span style={{ fontSize: 10, color: 'var(--text-muted)', background: 'var(--bg-card)', padding: '2px 8px', borderRadius: 4 }}>{a.type}</span>
-                        <select value={a.status}
-                          onChange={e => updateStatus(p.id, a.id, e.target.value as ClusterArticle['status'])}
-                          style={{
-                            padding: '4px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: 'none',
-                            background: STATUSES[a.status].bg, color: STATUSES[a.status].color,
-                          }}>
-                          {Object.entries(STATUSES).map(([v, s]) => <option key={v} value={v}>{s.label}</option>)}
-                        </select>
-                        <button onClick={() => deleteArticle(p.id, a.id)}
-                          style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}>×</button>
-                      </div>
-                    ))}
-
-                    {/* Add article form */}
-                    <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-                      <input placeholder="Título del artículo cluster *"
-                        value={newArticles[p.id]?.title || ''}
-                        onChange={e => setNewArticles(prev => ({ ...prev, [p.id]: { ...prev[p.id], title: e.target.value } }))}
-                        style={{ flex: 1, minWidth: 200, padding: '9px 12px', borderRadius: 8, background: 'var(--bg-base)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13 }} />
-                      <input placeholder="Keyword"
-                        value={newArticles[p.id]?.keyword || ''}
-                        onChange={e => setNewArticles(prev => ({ ...prev, [p.id]: { ...prev[p.id], keyword: e.target.value } }))}
-                        style={{ width: 140, padding: '9px 12px', borderRadius: 8, background: 'var(--bg-base)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13 }} />
-                      <select value={newArticles[p.id]?.type || 'Evergreen'}
-                        onChange={e => setNewArticles(prev => ({ ...prev, [p.id]: { ...prev[p.id], type: e.target.value } }))}
-                        style={{ padding: '9px 12px', borderRadius: 8, background: 'var(--bg-base)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13 }}>
-                        {TYPES.map(t => <option key={t}>{t}</option>)}
-                      </select>
-                      <button onClick={() => addArticle(p.id)}
-                        style={{ padding: '9px 16px', borderRadius: 8, border: 'none', background: '#7c3aed', color: 'white', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
-                        + Agregar
-                      </button>
-                    </div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
-                      Meta: 10-15 artículos por pillar para dominar el tema completo.
-                    </div>
-                  </div>
-                )}
+                <button
+                  onClick={() => setCluster(c)}
+                  style={{ fontSize: 11, color: '#06b6d4', background: 'none', border: 'none', cursor: 'pointer' }}
+                >
+                  Ver →
+                </button>
+                <button
+                  onClick={() => eliminar(i)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+                >
+                  <Trash2 size={14} />
+                </button>
               </div>
-            )
-          })}
+            ))}
+          </div>
         </div>
       )}
     </div>
