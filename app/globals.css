@@ -63,34 +63,44 @@ html, body {
 }
 
 .btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   background: linear-gradient(135deg, #7c3aed, #5b21b6);
   color: white;
   border: none;
   border-radius: 8px;
   padding: 10px 20px;
   font-weight: 600;
+  font-size: 13px;
   cursor: pointer;
   transition: all 0.2s ease;
+  font-family: inherit;
+  text-decoration: none;
 }
-.btn-primary:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
-}
+.btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+.btn-primary:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
 
 .btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   background: transparent;
   color: var(--text-muted);
   border: 1px solid var(--border-light);
   border-radius: 8px;
   padding: 10px 20px;
   font-weight: 500;
+  font-size: 13px;
   cursor: pointer;
   transition: all 0.2s ease;
+  font-family: inherit;
+  text-decoration: none;
 }
-.btn-secondary:hover {
-  color: var(--text);
-  border-color: #7c3aed;
-}
+.btn-secondary:hover { color: var(--text); border-color: #7c3aed; }
+.btn-secondary:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .input-field {
   background: var(--bg-base);
@@ -204,3 +214,72 @@ html, body {
   color: #a78bfa;
   border: 1px solid rgba(124,58,237,0.2);
 }
+
+/* ── Aliases para compatibilidad ─────────────────────────────── */
+/* .input → mismo que .input-field */
+.input {
+  background: var(--bg-base);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: var(--text);
+  font-size: 14px;
+  width: 100%;
+  transition: all 0.2s ease;
+  outline: none;
+  font-family: inherit;
+}
+.input:focus {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 3px rgba(124,58,237,0.15);
+}
+.input::placeholder { color: var(--text-dim); }
+
+/* .textarea → mismo que .textarea-field */
+.textarea {
+  background: var(--bg-base);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: var(--text);
+  font-size: 14px;
+  width: 100%;
+  transition: all 0.2s ease;
+  outline: none;
+  resize: vertical;
+  min-height: 90px;
+  font-family: inherit;
+}
+.textarea:focus {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 3px rgba(124,58,237,0.15);
+}
+.textarea::placeholder { color: var(--text-dim); }
+
+/* .btn → base, se combina con .btn-primary o .btn-secondary */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  font-family: inherit;
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* .spin → alias para rotate */
+.spin {
+  animation: spin 1s linear infinite;
+  display: inline-block;
+}
+
+/* fin de aliases */
