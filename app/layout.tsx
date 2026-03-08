@@ -8,7 +8,7 @@ import {
   LayoutDashboard, Lightbulb, HelpCircle,
   Calendar, DollarSign, Settings, Pen, Menu, X,
   Sparkles, TrendingUp, Key, Star, Network,
-  Anchor, Share2, BarChart2
+  Anchor, Share2, BarChart2, BookOpen
 } from 'lucide-react'
 
 const navItems = [
@@ -19,6 +19,7 @@ const navItems = [
   { href: '/seo', icon: TrendingUp, label: 'SEO & Copy', group: 'main' },
   { href: '/calendario', icon: Calendar, label: 'Calendario', group: 'main' },
   { href: '/monetizacion', icon: DollarSign, label: 'Monetización', group: 'main' },
+  { href: '/tecnicas', icon: BookOpen, label: '106 Técnicas', group: 'pro', badge: 'NEW' },
   { href: '/scorecard', icon: Star, label: 'Scorecard APEX', group: 'pro', badge: 'PRO' },
   { href: '/clusters', icon: Network, label: 'Topic Clusters', group: 'pro', badge: 'PRO' },
   { href: '/hooks', icon: Anchor, label: 'Generador de Hooks', group: 'pro', badge: 'PRO' },
