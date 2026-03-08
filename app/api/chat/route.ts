@@ -26,7 +26,7 @@ function buildPrompt(
   const niche    = profile?.niche    || 'emprendimiento'
   const audience = profile?.audience || 'emprendedores'
   const style    = profile?.style    || 'profesional'
-  const ctx = `Nicho: ${niche} | Audiencia: ${audience} | Estilo: ${style}`
+  const ctx      = `Nicho: ${niche} | Audiencia: ${audience} | Estilo: ${style}`
 
   switch (mode) {
     case 'ideas':
@@ -82,44 +82,108 @@ function getFallback(
 async function callClaude(prompt: string, apiKey: string): Promise<string> {
   const { default: Anthropic } = await import('@anthropic-ai/sdk')
   const client = new Anthropic({ apiKey })
-  const response = await client.messages.create({
+  const res = await client.messages.create({
     model:      MODEL,
     max_tokens: 2000,
     system:     SYSTEM,
     messages:   [{ role: 'user', content: prompt }],
   })
-  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  const text = res.content[0].type === 'text' ? res.content[0].text : ''
   return cleanResponse(text)
 }
 
+// ── Handler ───────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   const body    = await req.json()
   const { messages, mode, profile } = body
   const lastMsg = messages?.[messages.length - 1]?.content || ''
-  const prompt  = buildPrompt(mode, lastMsg, profile)
 
-  // 1️⃣ API key del usuario (enviada desde /configuracion)
+  // 1️⃣ API key explícita del usuario (enviada desde /configuracion)
   const userKey = req.headers.get('x-anthropic-key') || ''
   if (userKey && userKey.startsWith('sk-')) {
     try {
-      const text = await callClaude(prompt, userKey)
+      const prompt = buildPrompt(mode, lastMsg, profile)
+      const text   = await callClaude(prompt, userKey)
       return NextResponse.json({ text, model: MODEL })
     } catch (e) {
       console.error('[BlogOS] User key error:', e)
     }
   }
 
-  // 2️⃣ API key del servidor (variable de entorno en Vercel)
+  // 2️⃣ API key del servidor (variable de entorno — para Vercel)
   const serverKey = process.env.ANTHROPIC_API_KEY || ''
   if (serverKey && serverKey.startsWith('sk-')) {
     try {
-      const text = await callClaude(prompt, serverKey)
+      const prompt = buildPrompt(mode, lastMsg, profile)
+      const text   = await callClaude(prompt, serverKey)
       return NextResponse.json({ text, model: MODEL })
     } catch (e) {
       console.error('[BlogOS] Server key error:', e)
     }
   }
 
-  // 3️⃣ Mock inteligente — app 100% funcional sin API key
+  // 3️⃣ Proxy al servidor local con OAuth (tunnel de Cloudflare)
+  const proxyUrl = process.env.PROXY_TARGET_URL || ''
+  if (proxyUrl) {
+    try {
+      const res = await fetch(`${proxyUrl}/api/chat`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ messages, mode, profile }),
+        signal:  AbortSignal.timeout(40000),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        return NextResponse.json({ ...data, model: `${MODEL} (proxy)` })
+      }
+    } catch (e) {
+      console.error('[BlogOS] Proxy error:', e)
+    }
+  }
+
+  // 4️⃣ Claude CLI con OAuth (solo disponible en servidor local)
+  try {
+    const { spawn } = await import('child_process')
+    const { default: fs } = await import('fs')
+    const { default: path } = await import('path')
+    const { default: os } = await import('os')
+
+    const CLAUDE_BIN = '/home/devrel-frutero/.local/bin/claude'
+    if (fs.existsSync(CLAUDE_BIN)) {
+      const prompt  = buildPrompt(mode, lastMsg, profile)
+      const tmpFile = path.join(os.tmpdir(), `blogos-${Date.now()}.txt`)
+      fs.writeFileSync(tmpFile, prompt, 'utf8')
+
+      const { ANTHROPIC_API_KEY: _k, ...cleanEnv } = process.env as Record<string, string>
+      const text = await new Promise<string>((resolve, reject) => {
+        const proc = spawn('bash', ['-c', `cat "${tmpFile}" | "${CLAUDE_BIN}" --print`], {
+          timeout: 35000,
+          env: {
+            ...cleanEnv,
+            HOME: '/home/devrel-frutero',
+            PATH: '/home/devrel-frutero/.local/bin:/home/devrel-frutero/.nvm/versions/node/v24.13.1/bin:/usr/local/bin:/usr/bin:/bin',
+          },
+        })
+        let stdout = ''
+        let stderr = ''
+        proc.stdout.on('data', (d: Buffer) => { stdout += d.toString() })
+        proc.stderr.on('data', (d: Buffer) => { stderr += d.toString() })
+        proc.on('close', (code: number) => {
+          try { fs.unlinkSync(tmpFile) } catch {}
+          if (stdout.trim()) resolve(cleanResponse(stdout.trim()))
+          else reject(new Error(`CLI exit ${code}: ${stderr.slice(0, 200)}`))
+        })
+        proc.on('error', (err: Error) => {
+          try { fs.unlinkSync(tmpFile) } catch {}
+          reject(err)
+        })
+      })
+      return NextResponse.json({ text, model: `${MODEL} (oauth)` })
+    }
+  } catch (e) {
+    console.error('[BlogOS] Claude CLI error:', e)
+  }
+
+  // 5️⃣ Mock inteligente — siempre funciona, nunca muestra errores
   return NextResponse.json(getFallback(mode, lastMsg, profile))
 }
