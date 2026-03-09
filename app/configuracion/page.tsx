@@ -4,27 +4,41 @@ import { useState, useEffect } from 'react'
 import { Key, Check, Eye, EyeOff, ExternalLink, Zap, AlertCircle, CheckCircle, Loader2, Wifi, WifiOff } from 'lucide-react'
 
 type ApiStatus = 'idle' | 'testing' | 'ok' | 'error'
-type ApiConfig = { anthropic: string; serper: string; newsapi: string }
+type ApiConfig = { anthropic: string; serper: string; newsapi: string; groq: string; gemini: string }
 type HealthStatus = { status: 'live' | 'demo' | 'checking'; mode: string; latency?: number }
 
 const API_INFO = [
   {
     id: 'anthropic' as keyof ApiConfig,
-    name: 'Anthropic Claude',    emoji: '🤖', color: '#7c3aed',
+    name: 'Anthropic Claude',  emoji: '🤖', color: '#7c3aed', badge: 'Principal',
     desc: 'Motor de IA principal. Genera ideas, escribe secciones, analiza SEO y conduce sesiones reflexivas.',
     features: ['Generador de ideas', 'Escritura asistida', 'Análisis SEO', 'Sesión reflexiva', 'Hooks y copywriting'],
     getKey: 'https://console.anthropic.com/keys', placeholder: 'sk-ant-...',
   },
   {
+    id: 'groq' as keyof ApiConfig,
+    name: 'Groq (Llama 3.1)',  emoji: '⚡', color: '#06b6d4', badge: 'Gratis',
+    desc: 'IA ultra-rápida basada en Llama 3.1. Respuestas en menos de 1 segundo. Tier gratuito generoso.',
+    features: ['10x más rápida que Claude', '30 req/min gratis', 'Sin tarjeta de crédito', 'Llama 3.1 70B', 'Fallback automático'],
+    getKey: 'https://console.groq.com/keys', placeholder: 'gsk_...',
+  },
+  {
+    id: 'gemini' as keyof ApiConfig,
+    name: 'Google Gemini',     emoji: '✨', color: '#4285f4', badge: 'Gratis',
+    desc: 'IA de Google con tier gratuito. 15 requests/min sin costo. Excelente para contenido largo.',
+    features: ['15 req/min gratis', 'Gemini 1.5 Flash', 'Sin tarjeta de crédito', 'AI Studio gratuito', 'Fallback automático'],
+    getKey: 'https://aistudio.google.com/apikey', placeholder: 'AIzaSy...',
+  },
+  {
     id: 'serper' as keyof ApiConfig,
-    name: 'Serper (Google)',      emoji: '🔍', color: '#10b981',
+    name: 'Serper (Google)',    emoji: '🔍', color: '#10b981', badge: 'SEO',
     desc: 'Datos reales de Google: posicionamiento de competidores, keywords relacionadas y noticias de tu nicho.',
     features: ['Top 10 Google real', 'Keywords long-tail', 'Dificultad de keyword', 'Noticias del nicho', 'Análisis de competencia'],
     getKey: 'https://serper.dev', placeholder: 'tu-key-de-serper',
   },
   {
     id: 'newsapi' as keyof ApiConfig,
-    name: 'NewsAPI (Tendencias)', emoji: '📰', color: '#f59e0b',
+    name: 'NewsAPI',           emoji: '📰', color: '#f59e0b', badge: 'Noticias',
     desc: 'Noticias en tiempo real de tu industria para inspirar artículos relevantes y captar tendencias.',
     features: ['Noticias en tiempo real', 'Ideas desde tendencias', 'Fuentes verificadas', 'Filtro por idioma', 'Temas virales'],
     getKey: 'https://newsapi.org/register', placeholder: 'tu-key-de-newsapi',
@@ -32,7 +46,7 @@ const API_INFO = [
 ]
 
 export default function ConfiguracionPage() {
-  const [keys, setKeys]     = useState<ApiConfig>({ anthropic: '', serper: '', newsapi: '' })
+  const [keys, setKeys]     = useState<ApiConfig>({ anthropic: '', serper: '', newsapi: '', groq: '', gemini: '' })
   const [show, setShow]     = useState<Record<string, boolean>>({})
   const [status, setStatus] = useState<Record<string, ApiStatus>>({})
   const [saved, setSaved]   = useState(false)
@@ -84,6 +98,22 @@ export default function ConfiguracionPage() {
         })
         const d = await res.json()
         ok = !d.error
+      } else if (apiId === 'groq') {
+        const res = await fetch('/api/groq', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-groq-key': key },
+          body: JSON.stringify({ messages: [{ role: 'user', content: 'Responde solo: OK' }] }),
+        })
+        const d = await res.json()
+        ok = !d.error && !!d.text
+      } else if (apiId === 'gemini') {
+        const res = await fetch('/api/gemini', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-gemini-key': key },
+          body: JSON.stringify({ messages: [{ role: 'user', content: 'Responde solo: OK' }] }),
+        })
+        const d = await res.json()
+        ok = !d.error && !!d.text
       } else {
         const res = await fetch('/api/tendencias', {
           method: 'POST',

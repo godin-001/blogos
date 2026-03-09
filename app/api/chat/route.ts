@@ -92,6 +92,41 @@ async function callClaude(prompt: string, apiKey: string): Promise<string> {
   return cleanResponse(text)
 }
 
+async function callGroq(prompt: string, apiKey: string): Promise<string> {
+  const GROQ_MODEL = 'llama-3.1-70b-versatile'
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 2000,
+      temperature: 0.7,
+    }),
+    signal: AbortSignal.timeout(15000),
+  })
+  if (!res.ok) throw new Error(`Groq ${res.status}`)
+  const data = await res.json()
+  return cleanResponse(data.choices?.[0]?.message?.content || '')
+}
+
+async function callGemini(prompt: string, apiKey: string): Promise<string> {
+  const GEMINI_MODEL = 'gemini-1.5-flash'
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: { maxOutputTokens: 2000, temperature: 0.7 },
+    }),
+    signal: AbortSignal.timeout(15000),
+  })
+  if (!res.ok) throw new Error(`Gemini ${res.status}`)
+  const data = await res.json()
+  return cleanResponse(data.candidates?.[0]?.content?.parts?.[0]?.text || '')
+}
+
 // ── Handler ───────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   const body    = await req.json()
@@ -122,7 +157,35 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // 3️⃣ Proxy al servidor local con OAuth (tunnel de Cloudflare)
+  // 3️⃣ Groq API — ultra-rápida, tier gratuito (grok.com)
+  const userGroqKey   = req.headers.get('x-groq-key') || ''
+  const serverGroqKey = process.env.GROQ_API_KEY || ''
+  const groqKey       = userGroqKey || serverGroqKey
+  if (groqKey && groqKey.startsWith('gsk_')) {
+    try {
+      const prompt = buildPrompt(mode, lastMsg, profile)
+      const text   = await callGroq(prompt, groqKey)
+      return NextResponse.json({ text, model: 'groq/llama-3.1-70b' })
+    } catch (e) {
+      console.error('[BlogOS] Groq error:', e)
+    }
+  }
+
+  // 4️⃣ Gemini API — gratuito (aistudio.google.com)
+  const userGemKey   = req.headers.get('x-gemini-key') || ''
+  const serverGemKey = process.env.GEMINI_API_KEY || ''
+  const gemKey       = userGemKey || serverGemKey
+  if (gemKey) {
+    try {
+      const prompt = buildPrompt(mode, lastMsg, profile)
+      const text   = await callGemini(prompt, gemKey)
+      return NextResponse.json({ text, model: 'gemini/1.5-flash' })
+    } catch (e) {
+      console.error('[BlogOS] Gemini error:', e)
+    }
+  }
+
+  // 5️⃣ Proxy al servidor local con OAuth (tunnel de Cloudflare)
   const proxyUrl = process.env.PROXY_TARGET_URL || ''
   if (proxyUrl) {
     try {
@@ -141,7 +204,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // 4️⃣ Claude CLI con OAuth (solo disponible en servidor local)
+  // 6️⃣ Claude CLI con OAuth (solo disponible en servidor local)
   try {
     const { spawn } = await import('child_process')
     const { default: fs } = await import('fs')
@@ -184,6 +247,6 @@ export async function POST(req: NextRequest) {
     console.error('[BlogOS] Claude CLI error:', e)
   }
 
-  // 5️⃣ Mock inteligente — siempre funciona, nunca muestra errores
+  // 7️⃣ Mock inteligente — siempre funciona, nunca muestra errores
   return NextResponse.json(getFallback(mode, lastMsg, profile))
 }

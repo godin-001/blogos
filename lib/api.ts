@@ -2,10 +2,17 @@
  * BlogOS API helper — injects stored API keys into every request
  */
 
-export function getStoredKeys(): { anthropic: string; serper: string; newsapi: string } {
-  if (typeof window === 'undefined') return { anthropic: '', serper: '', newsapi: '' }
+export function getStoredKeys(): { anthropic: string; serper: string; newsapi: string; groq: string; gemini: string } {
+  if (typeof window === 'undefined') return { anthropic: '', serper: '', newsapi: '', groq: '', gemini: '' }
   const stored = localStorage.getItem('blogos_api_keys')
-  return stored ? JSON.parse(stored) : { anthropic: '', serper: '', newsapi: '' }
+  const parsed = stored ? JSON.parse(stored) : {}
+  return {
+    anthropic: parsed.anthropic || '',
+    serper:    parsed.serper    || '',
+    newsapi:   parsed.newsapi   || '',
+    groq:      parsed.groq      || '',
+    gemini:    parsed.gemini    || '',
+  }
 }
 
 export function getProfile(): Record<string, string> | null {
@@ -22,6 +29,8 @@ export async function callChat(payload: {
   const keys = getStoredKeys()
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (keys.anthropic) headers['x-anthropic-key'] = keys.anthropic
+  if (keys.groq)      headers['x-groq-key']      = keys.groq
+  if (keys.gemini)    headers['x-gemini-key']     = keys.gemini
 
   const res = await fetch('/api/chat', {
     method: 'POST',
