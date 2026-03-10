@@ -379,6 +379,7 @@ function ArticuloCard({ article, onClick }: { article: Article; onClick: () => v
 }
 
 // ── Página principal ─────────────────────────────────────────────
+// v2 — 2026-03-10
 export default function MiBlogPage() {
   const [articles, setArticles]     = useState<Article[]>([])
   const [pregunta, setPregunta]     = useState<Pregunta | null>(null)
