@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { TrendingUp, Sparkles, Search, Copy, Check, AlertCircle, CheckCircle, ExternalLink, RefreshCw } from 'lucide-react'
-import { callChat, callSeoResearch } from '@/lib/api'
+import { callChat, callSeoResearch, getStoredKeys } from '@/lib/api'
 
 type SeoResult = {
   score: number
@@ -81,7 +81,10 @@ export default function SeoPage() {
   const [copiedItem, setCopiedItem] = useState('')
   const [profile, setProfile] = useState<Record<string, string> | null>(null)
   const [activeFormula, setActiveFormula] = useState<number | null>(null)
-  const [seoTab, setSeoTab] = useState<'analisis' | 'google' | 'formulas'>('analisis')
+  const [seoTab, setSeoTab] = useState<'analisis' | 'google' | 'serpapi' | 'formulas'>('analisis')
+  const [serpKeyword, setSerpKeyword] = useState('')
+  const [serpLoading, setSerpLoading] = useState(false)
+  const [serpResult, setSerpResult] = useState<{ organic: { title: string; link: string; snippet: string; position: number }[]; related: string[]; paa: string[]; demo?: boolean } | null>(null)
 
   useEffect(() => {
     const p = localStorage.getItem('blogos_profile')
@@ -157,9 +160,10 @@ Responde SOLO con JSON válido sin markdown ni texto adicional:
         {[
           { id: 'analisis', label: '🔬 Análisis IA' },
           { id: 'google', label: '🌐 Google Research' },
+          { id: 'serpapi', label: '🔍 SERP Real' },
           { id: 'formulas', label: '✍️ Copywriting' },
         ].map(t => (
-          <button key={t.id} onClick={() => setSeoTab(t.id as 'analisis' | 'google' | 'formulas')} style={{
+          <button key={t.id} onClick={() => setSeoTab(t.id as 'analisis' | 'google' | 'serpapi' | 'formulas')} style={{
             padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer',
             border: 'none', transition: 'all 0.2s',
             background: seoTab === t.id ? 'linear-gradient(135deg, #7c3aed, #5b21b6)' : 'transparent',
@@ -403,7 +407,147 @@ Responde SOLO con JSON válido sin markdown ni texto adicional:
         </div>
       )}
 
-      {/* ── TAB 3: Fórmulas ── */}
+      {/* ── TAB 3: SerpApi Real ── */}
+      {seoTab === 'serpapi' && (
+        <div>
+          <div className="card" style={{ padding: '20px', marginBottom: 20 }}>
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>
+              🔍 Resultados reales de Google (SerpApi)
+            </h2>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>
+              Consulta resultados orgánicos reales, &quot;People Also Ask&quot; y keywords relacionadas.
+            </p>
+
+            {(() => {
+              const keys = typeof window !== 'undefined' ? getStoredKeys() : { serpapi: '' }
+              if (!keys.serpapi) {
+                return (
+                  <div style={{ padding: '16px 20px', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 10 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#fbbf24', marginBottom: 6 }}>⚠️ API key requerida</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                      Configura tu API key de SerpApi en <a href="/configuracion" style={{ color: '#a78bfa' }}>Configuración</a> para ver datos reales de Google.
+                    </div>
+                  </div>
+                )
+              }
+              return null
+            })()}
+
+            <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+              <div style={{ position: 'relative', flex: 1 }}>
+                <Search size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <input className="input-field" placeholder="Keyword a investigar en Google..."
+                  value={serpKeyword} onChange={e => setSerpKeyword(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      setSerpLoading(true)
+                      const keys = getStoredKeys()
+                      fetch('/api/serp', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', ...(keys.serpapi ? { 'x-serpapi-key': keys.serpapi } : {}) },
+                        body: JSON.stringify({ keyword: serpKeyword }),
+                      }).then(r => r.json()).then(d => { setSerpResult(d); setSerpLoading(false) }).catch(() => setSerpLoading(false))
+                    }
+                  }}
+                  style={{ paddingLeft: 36 }} />
+              </div>
+              <button className="btn-primary" onClick={() => {
+                setSerpLoading(true)
+                const keys = getStoredKeys()
+                fetch('/api/serp', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', ...(keys.serpapi ? { 'x-serpapi-key': keys.serpapi } : {}) },
+                  body: JSON.stringify({ keyword: serpKeyword }),
+                }).then(r => r.json()).then(d => { setSerpResult(d); setSerpLoading(false) }).catch(() => setSerpLoading(false))
+              }} disabled={serpLoading}
+                style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {serpLoading ? <RefreshCw size={15} className="animate-spin" /> : <Search size={15} />}
+                {serpLoading ? 'Buscando...' : 'Investigar'}
+              </button>
+            </div>
+          </div>
+
+          {serpResult && (
+            <div className="animate-fade-in">
+              {serpResult.demo && (
+                <div style={{ marginBottom: 12, padding: '8px 14px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 8, fontSize: 12, color: '#fbbf24' }}>
+                  DEMO — configura SerpApi para datos reales
+                </div>
+              )}
+
+              {/* Top 5 organic */}
+              {serpResult.organic?.length > 0 && (
+                <div className="card" style={{ padding: '16px 20px', marginBottom: 12 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>
+                    🏆 Top resultados orgánicos
+                  </div>
+                  {serpResult.organic.slice(0, 5).map((r, i) => (
+                    <div key={i} style={{ marginBottom: 12, paddingBottom: 12, borderBottom: i < 4 ? '1px solid var(--border)' : 'none' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <span style={{ fontSize: 11, fontWeight: 800, color: '#a78bfa', background: 'rgba(124,58,237,0.15)', padding: '1px 6px', borderRadius: 4 }}>#{r.position}</span>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: '#06b6d4' }}>{r.title}</span>
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5 }}>{r.snippet}</div>
+                      {r.link && (
+                        <a href={r.link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 10, color: '#64748b', marginTop: 2, display: 'inline-block' }}>
+                          {r.link.slice(0, 60)}...
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* People Also Ask */}
+              {serpResult.paa?.length > 0 && (
+                <div className="card" style={{ padding: '16px 20px', marginBottom: 12 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>
+                    ❓ People Also Ask
+                  </div>
+                  {serpResult.paa.map((q, i) => (
+                    <div key={i} style={{
+                      padding: '8px 12px', marginBottom: 6, background: 'var(--bg-base)',
+                      border: '1px solid var(--border-light)', borderRadius: 8, fontSize: 12, color: 'var(--text)',
+                    }}>
+                      {q}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Related keywords */}
+              {serpResult.related?.length > 0 && (
+                <div className="card" style={{ padding: '16px 20px' }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>
+                    🔗 Keywords relacionadas
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {serpResult.related.map(kw => (
+                      <button key={kw} onClick={() => setSerpKeyword(kw)} style={{
+                        fontSize: 12, padding: '4px 12px', borderRadius: 20, cursor: 'pointer',
+                        background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(124,58,237,0.25)',
+                        color: '#a78bfa',
+                      }}>#{kw}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!serpResult && !serpLoading && (
+            <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
+              <Search size={48} style={{ margin: '0 auto 16px', opacity: 0.3 }} />
+              <p style={{ fontSize: 14 }}>Ingresa una keyword para ver resultados reales de Google</p>
+              <p style={{ fontSize: 12, marginTop: 6, opacity: 0.7 }}>
+                Powered by SerpApi — datos directos del SERP de Google
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── TAB 4: Fórmulas ── */}
       {seoTab === 'formulas' && (
         <div>
           <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>

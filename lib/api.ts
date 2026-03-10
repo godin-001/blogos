@@ -2,16 +2,22 @@
  * BlogOS API helper — injects stored API keys into every request
  */
 
-export function getStoredKeys(): { anthropic: string; serper: string; newsapi: string; groq: string; gemini: string } {
-  if (typeof window === 'undefined') return { anthropic: '', serper: '', newsapi: '', groq: '', gemini: '' }
+export function getStoredKeys(): { anthropic: string; serper: string; newsapi: string; groq: string; gemini: string; openai: string; mistral: string; unsplash: string; serpapi: string; resend: string; convertkit: string } {
+  if (typeof window === 'undefined') return { anthropic: '', serper: '', newsapi: '', groq: '', gemini: '', openai: '', mistral: '', unsplash: '', serpapi: '', resend: '', convertkit: '' }
   const stored = localStorage.getItem('blogos_api_keys')
   const parsed = stored ? JSON.parse(stored) : {}
   return {
-    anthropic: parsed.anthropic || '',
-    serper:    parsed.serper    || '',
-    newsapi:   parsed.newsapi   || '',
-    groq:      parsed.groq      || '',
-    gemini:    parsed.gemini    || '',
+    anthropic:  parsed.anthropic  || '',
+    serper:     parsed.serper     || '',
+    newsapi:    parsed.newsapi    || '',
+    groq:       parsed.groq      || '',
+    gemini:     parsed.gemini     || '',
+    openai:     parsed.openai     || '',
+    mistral:    parsed.mistral    || '',
+    unsplash:   parsed.unsplash   || '',
+    serpapi:    parsed.serpapi    || '',
+    resend:     parsed.resend     || '',
+    convertkit: parsed.convertkit || '',
   }
 }
 
@@ -31,6 +37,8 @@ export async function callChat(payload: {
   if (keys.anthropic) headers['x-anthropic-key'] = keys.anthropic
   if (keys.groq)      headers['x-groq-key']      = keys.groq
   if (keys.gemini)    headers['x-gemini-key']     = keys.gemini
+  if (keys.openai)    headers['x-openai-key']     = keys.openai
+  if (keys.mistral)   headers['x-mistral-key']    = keys.mistral
 
   const res = await fetch('/api/chat', {
     method: 'POST',

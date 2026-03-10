@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Key, Check, Eye, EyeOff, ExternalLink, Zap, AlertCircle, CheckCircle, Loader2, Wifi, WifiOff } from 'lucide-react'
 
 type ApiStatus = 'idle' | 'testing' | 'ok' | 'error'
-type ApiConfig = { anthropic: string; serper: string; newsapi: string; groq: string; gemini: string }
+type ApiConfig = { anthropic: string; serper: string; newsapi: string; groq: string; gemini: string; openai: string; mistral: string; unsplash: string; serpapi: string; resend: string; convertkit: string }
 type HealthStatus = { status: 'live' | 'demo' | 'checking'; mode: string; latency?: number }
 
 const API_INFO = [
@@ -14,6 +14,13 @@ const API_INFO = [
     desc: 'Motor de IA principal. Genera ideas, escribe secciones, analiza SEO y conduce sesiones reflexivas.',
     features: ['Generador de ideas', 'Escritura asistida', 'Análisis SEO', 'Sesión reflexiva', 'Hooks y copywriting'],
     getKey: 'https://console.anthropic.com/keys', placeholder: 'sk-ant-...',
+  },
+  {
+    id: 'openai' as keyof ApiConfig,
+    name: 'OpenAI GPT-4o',  emoji: '🟢', color: '#10a37f', badge: 'GPT-4o',
+    desc: 'Alternativa a Claude con GPT-4o. Incluye acceso a DALL-E 3 para generar portadas con IA.',
+    features: ['GPT-4o mini (rápido)', 'GPT-4o (análisis)', 'Alternativa a Claude', 'Imágenes DALL-E 3', 'Fallback automático'],
+    getKey: 'https://platform.openai.com/api-keys', placeholder: 'sk-proj-...',
   },
   {
     id: 'groq' as keyof ApiConfig,
@@ -30,11 +37,32 @@ const API_INFO = [
     getKey: 'https://aistudio.google.com/apikey', placeholder: 'AIzaSy...',
   },
   {
+    id: 'mistral' as keyof ApiConfig,
+    name: 'Mistral AI',       emoji: '🌀', color: '#ff7000', badge: 'Gratis',
+    desc: 'IA europea con tier gratuito. Alternativa abierta con buen rendimiento en español.',
+    features: ['mistral-small gratis', 'Alternativa europea', 'API abierta', 'Tier gratuito', 'Fallback automático'],
+    getKey: 'https://console.mistral.ai/api-keys', placeholder: 'tu-key-mistral...',
+  },
+  {
+    id: 'unsplash' as keyof ApiConfig,
+    name: 'Unsplash',         emoji: '🖼️', color: '#111827', badge: 'Gratis',
+    desc: 'Busca imágenes de portada de alta calidad en Unsplash. Millones de fotos gratuitas.',
+    features: ['Fotos HD gratuitas', 'Búsqueda por tema', 'Crédito automático', 'Portadas para blog', '50 req/hora gratis'],
+    getKey: 'https://unsplash.com/developers', placeholder: 'tu-access-key-unsplash...',
+  },
+  {
     id: 'serper' as keyof ApiConfig,
     name: 'Serper (Google)',    emoji: '🔍', color: '#10b981', badge: 'SEO',
     desc: 'Datos reales de Google: posicionamiento de competidores, keywords relacionadas y noticias de tu nicho.',
     features: ['Top 10 Google real', 'Keywords long-tail', 'Dificultad de keyword', 'Noticias del nicho', 'Análisis de competencia'],
     getKey: 'https://serper.dev', placeholder: 'tu-key-de-serper',
+  },
+  {
+    id: 'serpapi' as keyof ApiConfig,
+    name: 'SerpApi',            emoji: '🔍', color: '#1a9c3e', badge: 'SEO Real',
+    desc: 'Datos reales de Google SERP: resultados orgánicos, People Also Ask y keywords relacionadas.',
+    features: ['Resultados orgánicos', 'People Also Ask', 'Keywords relacionadas', 'Multi-país', '100 búsquedas/mes gratis'],
+    getKey: 'https://serpapi.com/manage-api-key', placeholder: 'tu-serpapi-key...',
   },
   {
     id: 'newsapi' as keyof ApiConfig,
@@ -43,10 +71,24 @@ const API_INFO = [
     features: ['Noticias en tiempo real', 'Ideas desde tendencias', 'Fuentes verificadas', 'Filtro por idioma', 'Temas virales'],
     getKey: 'https://newsapi.org/register', placeholder: 'tu-key-de-newsapi',
   },
+  {
+    id: 'resend' as keyof ApiConfig,
+    name: 'Resend',            emoji: '📧', color: '#000000', badge: 'Email',
+    desc: 'Envía tus artículos como newsletter profesional por email. API moderna y fácil de usar.',
+    features: ['Email transaccional', 'HTML profesional', 'Branding BlogOS', '100 emails/día gratis', 'Métricas de envío'],
+    getKey: 'https://resend.com/api-keys', placeholder: 're_...',
+  },
+  {
+    id: 'convertkit' as keyof ApiConfig,
+    name: 'ConvertKit',        emoji: '📮', color: '#fb6970', badge: 'Lista',
+    desc: 'Gestiona tu lista de suscriptores. Captura leads y construye tu audiencia de email.',
+    features: ['Captura de leads', 'Lista de suscriptores', 'Tags y segmentos', 'Automatizaciones', '1,000 subs gratis'],
+    getKey: 'https://app.convertkit.com/account_settings/advanced_settings', placeholder: 'tu-convertkit-key...',
+  },
 ]
 
 export default function ConfiguracionPage() {
-  const [keys, setKeys]     = useState<ApiConfig>({ anthropic: '', serper: '', newsapi: '', groq: '', gemini: '' })
+  const [keys, setKeys]     = useState<ApiConfig>({ anthropic: '', serper: '', newsapi: '', groq: '', gemini: '', openai: '', mistral: '', unsplash: '', serpapi: '', resend: '', convertkit: '' })
   const [show, setShow]     = useState<Record<string, boolean>>({})
   const [status, setStatus] = useState<Record<string, ApiStatus>>({})
   const [saved, setSaved]   = useState(false)
@@ -54,7 +96,7 @@ export default function ConfiguracionPage() {
 
   useEffect(() => {
     const stored = localStorage.getItem('blogos_api_keys')
-    if (stored) setKeys(JSON.parse(stored))
+    if (stored) setKeys(prev => ({ ...prev, ...JSON.parse(stored) }))
     checkHealth()
   }, [])
 
@@ -90,6 +132,22 @@ export default function ConfiguracionPage() {
         })
         const d = await res.json()
         ok = !d.error && !!d.text
+      } else if (apiId === 'openai') {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-openai-key': key },
+          body: JSON.stringify({ messages: [{ role: 'user', content: 'Responde solo: OK' }] }),
+        })
+        const d = await res.json()
+        ok = !d.error && !!d.text
+      } else if (apiId === 'mistral') {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-mistral-key': key },
+          body: JSON.stringify({ messages: [{ role: 'user', content: 'Responde solo: OK' }] }),
+        })
+        const d = await res.json()
+        ok = !d.error && !!d.text
       } else if (apiId === 'serper') {
         const res = await fetch('/api/seo-research', {
           method: 'POST',
@@ -114,6 +172,27 @@ export default function ConfiguracionPage() {
         })
         const d = await res.json()
         ok = !d.error && !!d.text
+      } else if (apiId === 'unsplash') {
+        const res = await fetch('/api/unsplash', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-unsplash-key': key },
+          body: JSON.stringify({ query: 'test' }),
+        })
+        const d = await res.json()
+        ok = !d.error && !d.demo
+      } else if (apiId === 'serpapi') {
+        const res = await fetch('/api/serp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-serpapi-key': key },
+          body: JSON.stringify({ keyword: 'test' }),
+        })
+        const d = await res.json()
+        ok = !d.error && !d.demo
+      } else if (apiId === 'resend') {
+        // Just validate key format
+        ok = key.startsWith('re_') && key.length > 10
+      } else if (apiId === 'convertkit') {
+        ok = key.length > 10
       } else {
         const res = await fetch('/api/tendencias', {
           method: 'POST',
@@ -223,7 +302,7 @@ export default function ConfiguracionPage() {
       <div style={{
         display: 'flex', gap: 8, marginBottom: 24, alignItems: 'center', flexWrap: 'wrap',
       }}>
-        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{activeCount}/3 APIs configuradas</span>
+        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{activeCount}/{API_INFO.length} APIs configuradas</span>
         {API_INFO.map(api => (
           <div key={api.id} style={{
             fontSize: 11, padding: '3px 10px', borderRadius: 20, fontWeight: 600,
@@ -254,6 +333,10 @@ export default function ConfiguracionPage() {
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
                     <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{api.name}</span>
+                    <span style={{
+                      fontSize: 10, padding: '1px 7px', borderRadius: 10,
+                      background: `${api.color}20`, color: api.color, fontWeight: 700,
+                    }}>{api.badge}</span>
                     {hasKey(api.id) && (
                       <span style={{
                         fontSize: 10, padding: '1px 7px', borderRadius: 10,
@@ -333,7 +416,7 @@ export default function ConfiguracionPage() {
       }}>
         <div style={{ fontSize: 11, color: '#22d3ee', fontWeight: 700, marginBottom: 3 }}>🔒 Privacidad garantizada</div>
         <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-          Tus keys se guardan <strong>solo en tu navegador</strong> (localStorage). Nunca se envían a servidores de BlogOS. Solo se usan directamente al llamar a Anthropic, Serper o NewsAPI.
+          Tus keys se guardan <strong>solo en tu navegador</strong> (localStorage). Nunca se envían a servidores de BlogOS. Solo se usan directamente al llamar a cada API respectiva.
         </div>
       </div>
 
@@ -342,8 +425,10 @@ export default function ConfiguracionPage() {
         <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 14 }}>📖 Guía de configuración</h3>
         {[
           { n: '1', title: 'Anthropic (más importante)', color: '#7c3aed', desc: 'console.anthropic.com → API Keys → Create Key. Muy barato (centavos por uso). Activa toda la IA generativa.' },
-          { n: '2', title: 'Serper (gratis 2,500/mes)',   color: '#10b981', desc: 'serper.dev → Dashboard → API Key. Plan gratuito suficiente para uso personal. Activa datos reales de Google.' },
-          { n: '3', title: 'NewsAPI (gratis 100/día)',    color: '#f59e0b', desc: 'newsapi.org → Get API Key. Plan developer gratuito. Activa las tendencias en tiempo real de tu industria.' },
+          { n: '2', title: 'OpenAI (alternativa + DALL-E)', color: '#10a37f', desc: 'platform.openai.com → API Keys. GPT-4o como alternativa y DALL-E 3 para portadas con IA.' },
+          { n: '3', title: 'Groq o Gemini (gratis)', color: '#06b6d4', desc: 'Ambas gratuitas. Groq es ultra-rápida. Gemini tiene 15 req/min gratis. Ideal como fallback.' },
+          { n: '4', title: 'Serper o SerpApi (SEO)',   color: '#10b981', desc: 'Datos reales de Google. Serper: serper.dev. SerpApi: serpapi.com. Activa investigación SEO real.' },
+          { n: '5', title: 'Resend + ConvertKit (email)', color: '#fb6970', desc: 'Resend para enviar newsletters. ConvertKit para gestionar suscriptores. Ambas con tier gratis.' },
         ].map(s => (
           <div key={s.n} style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
             <div style={{

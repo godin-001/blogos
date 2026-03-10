@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { DollarSign, ChevronDown, ChevronUp, ExternalLink, CheckCircle } from 'lucide-react'
+import { ChevronDown, ChevronUp, ExternalLink, CheckCircle } from 'lucide-react'
+import ConvertKitForm from '@/app/components/ConvertKitForm'
 
 const MODELS = [
   {
@@ -315,6 +316,15 @@ export default function MonetizacionPage() {
             </div>
           )
         })}
+      </div>
+
+      {/* Captura de Leads */}
+      <div style={{ marginTop: 24, marginBottom: 24 }}>
+        <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', marginBottom: 12 }}>📧 Captura de leads</h2>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16, lineHeight: 1.5 }}>
+          Agrega suscriptores a tu lista de ConvertKit directamente desde BlogOS. Configura tu API key en Configuración.
+        </p>
+        <ConvertKitForm />
       </div>
 
       {/* Final CTA */}

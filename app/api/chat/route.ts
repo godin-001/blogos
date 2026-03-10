@@ -178,6 +178,47 @@ async function callGemini(prompt: string, apiKey: string): Promise<string> {
   return cleanResponse(data.candidates?.[0]?.content?.parts?.[0]?.text || '')
 }
 
+async function callOpenAI(prompt: string, apiKey: string, mode: string): Promise<string> {
+  const model = ['ideas', 'hooks', 'estructura'].includes(mode) ? 'gpt-4o-mini' : 'gpt-4o'
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: 'system', content: SYSTEM },
+        { role: 'user', content: prompt },
+      ],
+      max_tokens: 2000,
+      temperature: 0.7,
+    }),
+    signal: AbortSignal.timeout(30000),
+  })
+  if (!res.ok) throw new Error(`OpenAI ${res.status}`)
+  const data = await res.json()
+  return cleanResponse(data.choices?.[0]?.message?.content || '')
+}
+
+async function callMistral(prompt: string, apiKey: string): Promise<string> {
+  const res = await fetch('https://api.mistral.ai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model: 'mistral-small-latest',
+      messages: [
+        { role: 'system', content: SYSTEM },
+        { role: 'user', content: prompt },
+      ],
+      max_tokens: 2000,
+      temperature: 0.7,
+    }),
+    signal: AbortSignal.timeout(15000),
+  })
+  if (!res.ok) throw new Error(`Mistral ${res.status}`)
+  const data = await res.json()
+  return cleanResponse(data.choices?.[0]?.message?.content || '')
+}
+
 // ── Handler principal ─────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   const body    = await req.json()
@@ -265,7 +306,36 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // 5️⃣ Proxy al servidor local con OAuth (tunnel de Cloudflare)
+  // 5️⃣ OpenAI GPT-4o — alternativa a Claude
+  const userOpenAIKey   = req.headers.get('x-openai-key') || ''
+  const serverOpenAIKey = process.env.OPENAI_API_KEY || ''
+  const openaiKey       = userOpenAIKey || serverOpenAIKey
+  if (openaiKey && openaiKey.startsWith('sk-')) {
+    try {
+      const prompt = buildPrompt(mode, lastMsg, profile)
+      const text   = await callOpenAI(prompt, openaiKey, mode || 'default')
+      const usedModel = ['ideas', 'hooks', 'estructura'].includes(mode || '') ? 'gpt-4o-mini' : 'gpt-4o'
+      return NextResponse.json({ text, model: `openai/${usedModel}` })
+    } catch (e) {
+      console.error('[BlogOS] OpenAI error:', e)
+    }
+  }
+
+  // 6️⃣ Mistral AI — gratuito, europeo
+  const userMistralKey   = req.headers.get('x-mistral-key') || ''
+  const serverMistralKey = process.env.MISTRAL_API_KEY || ''
+  const mistralKey       = userMistralKey || serverMistralKey
+  if (mistralKey) {
+    try {
+      const prompt = buildPrompt(mode, lastMsg, profile)
+      const text   = await callMistral(prompt, mistralKey)
+      return NextResponse.json({ text, model: 'mistral/small-latest' })
+    } catch (e) {
+      console.error('[BlogOS] Mistral error:', e)
+    }
+  }
+
+  // 7️⃣ Proxy al servidor local con OAuth (tunnel de Cloudflare)
   const proxyUrl = process.env.PROXY_TARGET_URL || ''
   if (proxyUrl) {
     try {
@@ -284,7 +354,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // 6️⃣ Claude CLI con OAuth (solo disponible en servidor local)
+  // 8️⃣ Claude CLI con OAuth (solo disponible en servidor local)
   try {
     const { spawn } = await import('child_process')
     const { default: fs } = await import('fs')
@@ -328,6 +398,6 @@ export async function POST(req: NextRequest) {
     console.error('[BlogOS] Claude CLI error:', e)
   }
 
-  // 7️⃣ Mock inteligente — siempre funciona
+  // 9️⃣ Mock inteligente — siempre funciona
   return NextResponse.json(getFallback(mode, lastMsg, profile))
 }

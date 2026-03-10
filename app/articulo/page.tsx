@@ -1,8 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Sparkles, Check, Copy, Download, Save, ChevronDown, ChevronUp, Loader2, AlertCircle } from 'lucide-react'
-import { callChat } from '@/lib/api'
+import { Sparkles, Check, Copy, Download, Save, ChevronDown, ChevronUp, Loader2, AlertCircle, X } from 'lucide-react'
+import { callChat, getStoredKeys, getProfile as getProfileFn } from '@/lib/api'
+import UnsplashPicker from '@/app/components/UnsplashPicker'
+import NewsletterSend from '@/app/components/NewsletterSend'
 
 type Section = {
   id: string
@@ -72,6 +74,7 @@ type Article = {
   ejemplos: string
   reflexion: string
   cta: string
+  coverImage?: string
   createdAt: string
 }
 
@@ -94,6 +97,12 @@ export default function ArticuloPage() {
   const [globalMsg, setGlobalMsg] = useState('')
   const [autoSaveMsg, setAutoSaveMsg] = useState('')
   const [isDirty, setIsDirty] = useState(false)
+  const [coverImage, setCoverImage] = useState('')
+  const [showUnsplash, setShowUnsplash] = useState(false)
+  const [showNewsletter, setShowNewsletter] = useState(false)
+  const [showThreadModal, setShowThreadModal] = useState(false)
+  const [threadTweets, setThreadTweets] = useState<string[]>([])
+  const [threadLoading, setThreadLoading] = useState(false)
 
   // Contador de palabras y tiempo de lectura
   function getWordStats(c: Record<string, string>) {
@@ -213,7 +222,8 @@ Solo el contenido de la sección, sin explicaciones adicionales.`
     const articles = JSON.parse(localStorage.getItem('blogos_articles') || '[]')
     const article: Article = {
       id: `art-${Date.now()}`,
-      ...content as Omit<Article, 'id' | 'createdAt'>,
+      ...content as Omit<Article, 'id' | 'createdAt' | 'coverImage'>,
+      coverImage: coverImage || undefined,
       createdAt: new Date().toISOString(),
     }
     articles.push(article)
@@ -242,6 +252,45 @@ Solo el contenido de la sección, sin explicaciones adicionales.`
     URL.revokeObjectURL(url)
   }
 
+  const generateThread = async () => {
+    setThreadLoading(true)
+    try {
+      const res = await fetch('/api/twitter-share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          titulo: content.titulo,
+          gancho: content.gancho,
+          subtitulos: content.subtitulos,
+          reflexion: content.reflexion,
+          cta: content.cta,
+        }),
+      })
+      const data = await res.json()
+      setThreadTweets(data.tweets || [])
+      setShowThreadModal(true)
+    } catch {
+      setGlobalMsg('Error al generar thread')
+      setTimeout(() => setGlobalMsg(''), 3000)
+    }
+    setThreadLoading(false)
+  }
+
+  const shareLinkedIn = () => {
+    const profileData = getProfileFn()
+    const blogUrl = profileData?.blog || profileData?.website || ''
+    if (blogUrl) {
+      window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(blogUrl)}`, '_blank')
+    } else {
+      // Copy content for LinkedIn
+      const hashtags = profile?.niche ? `#${profile.niche.replace(/\s+/g, '')} #BlogOS #ContentMarketing` : '#BlogOS #ContentMarketing'
+      const linkedinText = `${content.titulo}\n\n${content.gancho}\n\n${hashtags}`
+      navigator.clipboard.writeText(linkedinText).catch(() => {})
+      setGlobalMsg('Contenido copiado para LinkedIn (no hay URL de blog en tu perfil)')
+      setTimeout(() => setGlobalMsg(''), 3000)
+    }
+  }
+
   return (
     <div className="animate-fade-in">
       {/* Header */}
@@ -264,6 +313,19 @@ Solo el contenido de la sección, sin explicaciones adicionales.`
         }}>
           <AlertCircle size={14} />
           {globalMsg}
+        </div>
+      )}
+
+      {/* Cover Image */}
+      {coverImage && (
+        <div style={{ marginBottom: 16, borderRadius: 12, overflow: 'hidden', position: 'relative' }}>
+          <img src={coverImage} alt="Portada" style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }} />
+          <button onClick={() => setCoverImage('')} style={{
+            position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.6)', border: 'none',
+            borderRadius: '50%', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+          }}>
+            <X size={14} color="white" />
+          </button>
         </div>
       )}
 
@@ -314,6 +376,23 @@ Solo el contenido de la sección, sin explicaciones adicionales.`
           {showPreview ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
           {showPreview ? 'Ocultar preview' : 'Ver preview'}
         </button>
+        <button className="btn-secondary" onClick={() => setShowUnsplash(!showUnsplash)}
+          style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          🖼️ Portada
+        </button>
+        <button className="btn-secondary" onClick={generateThread} disabled={threadLoading || !content.titulo?.trim()}
+          style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {threadLoading ? <Loader2 size={14} className="animate-spin" /> : null}
+          🐦 Thread
+        </button>
+        <button className="btn-secondary" onClick={shareLinkedIn}
+          style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          💼 LinkedIn
+        </button>
+        <button className="btn-secondary" onClick={() => setShowNewsletter(!showNewsletter)}
+          style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          📧 Newsletter
+        </button>
 
         {/* Contador de palabras + autosave */}
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -330,9 +409,73 @@ Solo el contenido de la sección, sin explicaciones adicionales.`
         </div>
       </div>
 
+      {/* Unsplash Picker */}
+      {showUnsplash && (
+        <UnsplashPicker
+          defaultQuery={content.titulo || profile?.niche || ''}
+          onSelect={(url) => {
+            setCoverImage(url)
+            setShowUnsplash(false)
+          }}
+        />
+      )}
+
+      {/* Newsletter Send */}
+      {showNewsletter && (
+        <NewsletterSend
+          defaultSubject={content.titulo}
+          content={`${content.gancho}\n\n${content.subtitulos}\n\n${content.ejemplos}\n\n${content.reflexion}\n\n${content.cta}`}
+        />
+      )}
+
+      {/* Twitter Thread Modal */}
+      {showThreadModal && threadTweets.length > 0 && (
+        <div className="card" style={{ padding: 20, marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>🐦 Thread generado ({threadTweets.length} tweets)</div>
+            <button onClick={() => setShowThreadModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+              <X size={18} />
+            </button>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
+            {threadTweets.map((tweet, i) => (
+              <div key={i} style={{
+                padding: '12px 14px', background: 'var(--bg-base)', borderRadius: 10,
+                border: '1px solid var(--border-light)', fontSize: 13, color: 'var(--text)',
+                lineHeight: 1.5,
+              }}>
+                {tweet}
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
+                  {tweet.length} caracteres
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn-primary" onClick={() => {
+              window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(threadTweets[0])}`, '_blank')
+            }} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              🐦 Publicar en X
+            </button>
+            <button className="btn-secondary" onClick={() => {
+              navigator.clipboard.writeText(threadTweets.join('\n\n---\n\n'))
+              setGlobalMsg('Thread copiado al portapapeles')
+              setTimeout(() => setGlobalMsg(''), 2000)
+            }} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Copy size={14} /> Copiar todo
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Preview */}
       {showPreview && (
         <div className="card" style={{ padding: '20px 24px', marginBottom: 20 }}>
+          {coverImage && (
+            <div style={{ marginBottom: 16, borderRadius: 8, overflow: 'hidden' }}>
+              <img src={coverImage} alt="Portada" style={{ width: '100%', height: 180, objectFit: 'cover', display: 'block' }} />
+            </div>
+          )}
           <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', marginBottom: 12 }}>
             {content.titulo || '(Sin título)'}
           </h2>
