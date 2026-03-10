@@ -7,13 +7,14 @@ import {
   LayoutDashboard, Lightbulb, HelpCircle,
   Calendar, DollarSign, Settings, Pen,
   Sparkles, TrendingUp, Key, Star, Network,
-  Anchor, Share2, BarChart2, BookOpen, Flame
+  Anchor, Share2, BarChart2, BookOpen, Flame, Library
 } from 'lucide-react'
 
 const navItems = [
   { href: '/',             icon: LayoutDashboard, label: 'Dashboard',           group: 'main' },
   { href: '/ideas',        icon: Lightbulb,       label: 'Ideas',               group: 'main' },
   { href: '/articulo',     icon: Pen,             label: 'Nuevo Artículo',      group: 'main' },
+  { href: '/mi-blog',      icon: Library,         label: 'Mi Blog',             group: 'main', badge: 'NEW' },
   { href: '/preguntas',    icon: HelpCircle,      label: 'Sesión Reflexiva',    group: 'main' },
   { href: '/seo',          icon: TrendingUp,      label: 'SEO & Copy',          group: 'main' },
   { href: '/calendario',   icon: Calendar,        label: 'Calendario',          group: 'main' },
