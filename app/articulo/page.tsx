@@ -92,6 +92,17 @@ export default function ArticuloPage() {
   const [copied, setCopied] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
   const [globalMsg, setGlobalMsg] = useState('')
+  const [autoSaveMsg, setAutoSaveMsg] = useState('')
+  const [isDirty, setIsDirty] = useState(false)
+
+  // Contador de palabras y tiempo de lectura
+  function getWordStats(c: Record<string, string>) {
+    const fullText = Object.values(c).join(' ')
+    const words = fullText.trim() ? fullText.trim().split(/\s+/).length : 0
+    const readingMin = Math.max(1, Math.ceil(words / 200))
+    return { words, readingMin }
+  }
+  const wordStats = getWordStats(content)
 
   useEffect(() => {
     // Leer params SIN useSearchParams (evita BAILOUT_TO_CLIENT_SIDE_RENDERING)
@@ -105,7 +116,38 @@ export default function ArticuloPage() {
 
     const p = localStorage.getItem('blogos_profile')
     if (p) setProfile(JSON.parse(p))
+
+    // Restaurar borrador guardado automáticamente
+    const draft = localStorage.getItem('blogos_article_draft')
+    if (draft) {
+      try {
+        const parsed = JSON.parse(draft)
+        // Solo restaurar si hay contenido y no hay idea desde URL
+        const params = new URLSearchParams(window.location.search)
+        if (!params.get('idea') && Object.values(parsed).some((v: unknown) => String(v).trim())) {
+          setContent(parsed)
+        }
+      } catch {}
+    }
   }, [])
+
+  // Auto-save cada 30 segundos si hay cambios
+  useEffect(() => {
+    if (!isDirty) return
+    const timer = setInterval(() => {
+      localStorage.setItem('blogos_article_draft', JSON.stringify(content))
+      setAutoSaveMsg('Borrador guardado automáticamente')
+      setIsDirty(false)
+      setTimeout(() => setAutoSaveMsg(''), 3000)
+    }, 30000)
+    return () => clearInterval(timer)
+  }, [isDirty, content])
+
+  // Marcar como dirty cuando cambia el contenido
+  const handleContentChange = (sectionId: string, value: string) => {
+    setContent(prev => ({ ...prev, [sectionId]: value }))
+    setIsDirty(true)
+  }
 
   const completedSections = SECTIONS.filter(s => content[s.id]?.trim().length > 0).length
   const progress = (completedSections / SECTIONS.length) * 100
@@ -251,7 +293,7 @@ Solo el contenido de la sección, sin explicaciones adicionales.`
       </div>
 
       {/* Actions bar */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
         <button className="btn-primary" onClick={saveArticle} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           {saved ? <Check size={15} /> : <Save size={15} />}
           {saved ? '¡Guardado!' : 'Guardar'}
@@ -272,6 +314,20 @@ Solo el contenido de la sección, sin explicaciones adicionales.`
           {showPreview ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
           {showPreview ? 'Ocultar preview' : 'Ver preview'}
         </button>
+
+        {/* Contador de palabras + autosave */}
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
+          {autoSaveMsg && (
+            <span style={{ fontSize: 11, color: '#34d399', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Check size={11} /> {autoSaveMsg}
+            </span>
+          )}
+          {wordStats.words > 0 && (
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+              📝 {wordStats.words.toLocaleString()} palabras · {wordStats.readingMin} min de lectura
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Preview */}
@@ -361,8 +417,9 @@ Solo el contenido de la sección, sin explicaciones adicionales.`
                   className="textarea-field"
                   placeholder={section.placeholder}
                   value={content[section.id]}
-                  onChange={e => setContent(prev => ({ ...prev, [section.id]: e.target.value }))}
+                  onChange={e => handleContentChange(section.id, e.target.value)}
                   style={{ minHeight: section.id === 'subtitulos' || section.id === 'ejemplos' ? 160 : 120 }}
+                  aria-label={`${section.title} — sección ${index + 1} de ${SECTIONS.length}`}
                 />
 
                 {/* Error inline */}

@@ -294,11 +294,15 @@ export default function ConfiguracionPage() {
                     onChange={e => setKeys(prev => ({ ...prev, [api.id]: e.target.value }))}
                     style={{ paddingRight: 40 }}
                   />
-                  <button onClick={() => setShow(prev => ({ ...prev, [api.id]: !prev[api.id] }))} style={{
-                    position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
-                    background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)',
-                  }}>
-                    {show[api.id] ? <EyeOff size={15} /> : <Eye size={15} />}
+                  <button
+                    onClick={() => setShow(prev => ({ ...prev, [api.id]: !prev[api.id] }))}
+                    style={{
+                      position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+                      background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)',
+                    }}
+                    aria-label={show[api.id] ? `Ocultar API key de ${api.name}` : `Mostrar API key de ${api.name}`}
+                  >
+                    {show[api.id] ? <EyeOff size={15} aria-hidden="true" /> : <Eye size={15} aria-hidden="true" />}
                   </button>
                 </div>
                 <button

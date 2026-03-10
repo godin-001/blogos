@@ -1,9 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  typescript: {
-    ignoreBuildErrors: true,
-  },
+  // typescript strict mode habilitado - no ignorar errores en build
 };
 
 export default nextConfig;

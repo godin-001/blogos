@@ -6,7 +6,19 @@ import {
   mockReflexiveQuestion,
 } from '@/lib/mock-ai'
 
-const MODEL = 'claude-opus-4-5'
+// ── Modelos por tarea ─────────────────────────────────────────────
+// Usa el modelo más económico para tareas simples, el potente para análisis
+const MODELS = {
+  fast:     'claude-haiku-4-5',    // ideas, hooks, estructura — rápido y barato
+  analysis: 'claude-opus-4-5',     // SEO, reflexión — necesita más inteligencia
+  default:  'claude-opus-4-5',
+}
+
+function getModelForMode(mode: string): string {
+  if (['ideas', 'hooks', 'estructura'].includes(mode)) return MODELS.fast
+  if (['seo', 'reflexion'].includes(mode)) return MODELS.analysis
+  return MODELS.default
+}
 
 const SYSTEM = `Eres BlogOS, agente experto en blogs de alto nivel. Hablas en español.
 Eres directo, estratégico y motivador. Expertise: SEO, copywriting, storytelling, monetización.`
@@ -79,17 +91,56 @@ function getFallback(
   return { text: 'Responde brevemente a esta pregunta de blog.', demo: true }
 }
 
-async function callClaude(prompt: string, apiKey: string): Promise<string> {
+// ── Llamadas a modelos de IA ─────────────────────────────────────
+
+async function callClaude(prompt: string, apiKey: string, model: string): Promise<string> {
   const { default: Anthropic } = await import('@anthropic-ai/sdk')
   const client = new Anthropic({ apiKey })
   const res = await client.messages.create({
-    model:      MODEL,
+    model,
     max_tokens: 2000,
     system:     SYSTEM,
     messages:   [{ role: 'user', content: prompt }],
   })
   const text = res.content[0].type === 'text' ? res.content[0].text : ''
   return cleanResponse(text)
+}
+
+async function callClaudeStream(
+  prompt: string,
+  apiKey: string,
+  model: string
+): Promise<ReadableStream> {
+  const { default: Anthropic } = await import('@anthropic-ai/sdk')
+  const client = new Anthropic({ apiKey })
+
+  const stream = client.messages.stream({
+    model,
+    max_tokens: 2000,
+    system:     SYSTEM,
+    messages:   [{ role: 'user', content: prompt }],
+  })
+
+  const encoder = new TextEncoder()
+  return new ReadableStream({
+    async start(controller) {
+      try {
+        for await (const chunk of stream) {
+          if (
+            chunk.type === 'content_block_delta' &&
+            chunk.delta.type === 'text_delta'
+          ) {
+            const data = JSON.stringify({ chunk: chunk.delta.text })
+            controller.enqueue(encoder.encode(`data: ${data}\n\n`))
+          }
+        }
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'))
+        controller.close()
+      } catch (err) {
+        controller.error(err)
+      }
+    },
+  })
 }
 
 async function callGroq(prompt: string, apiKey: string): Promise<string> {
@@ -111,7 +162,7 @@ async function callGroq(prompt: string, apiKey: string): Promise<string> {
 }
 
 async function callGemini(prompt: string, apiKey: string): Promise<string> {
-  const GEMINI_MODEL = 'gemini-1.5-flash'
+  const GEMINI_MODEL = 'gemini-2.0-flash-exp'
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`
   const res = await fetch(url, {
     method: 'POST',
@@ -127,37 +178,66 @@ async function callGemini(prompt: string, apiKey: string): Promise<string> {
   return cleanResponse(data.candidates?.[0]?.content?.parts?.[0]?.text || '')
 }
 
-// ── Handler ───────────────────────────────────────────────────────
+// ── Handler principal ─────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   const body    = await req.json()
   const { messages, mode, profile } = body
   const lastMsg = messages?.[messages.length - 1]?.content || ''
 
-  // 1️⃣ API key explícita del usuario (enviada desde /configuracion)
+  const wantsStream = req.headers.get('x-stream') === 'true'
+  const model       = getModelForMode(mode || 'default')
+
+  // 1️⃣ API key del usuario — con soporte de streaming
   const userKey = req.headers.get('x-anthropic-key') || ''
   if (userKey && userKey.startsWith('sk-')) {
     try {
       const prompt = buildPrompt(mode, lastMsg, profile)
-      const text   = await callClaude(prompt, userKey)
-      return NextResponse.json({ text, model: MODEL })
+
+      if (wantsStream) {
+        const stream = await callClaudeStream(prompt, userKey, model)
+        return new Response(stream, {
+          headers: {
+            'Content-Type':  'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection':    'keep-alive',
+            'X-Model':       `${model} (stream)`,
+          },
+        })
+      }
+
+      const text = await callClaude(prompt, userKey, model)
+      return NextResponse.json({ text, model })
     } catch (e) {
       console.error('[BlogOS] User key error:', e)
     }
   }
 
-  // 2️⃣ API key del servidor (variable de entorno — para Vercel)
+  // 2️⃣ API key del servidor
   const serverKey = process.env.ANTHROPIC_API_KEY || ''
   if (serverKey && serverKey.startsWith('sk-')) {
     try {
       const prompt = buildPrompt(mode, lastMsg, profile)
-      const text   = await callClaude(prompt, serverKey)
-      return NextResponse.json({ text, model: MODEL })
+
+      if (wantsStream) {
+        const stream = await callClaudeStream(prompt, serverKey, model)
+        return new Response(stream, {
+          headers: {
+            'Content-Type':  'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection':    'keep-alive',
+            'X-Model':       `${model} (stream)`,
+          },
+        })
+      }
+
+      const text = await callClaude(prompt, serverKey, model)
+      return NextResponse.json({ text, model })
     } catch (e) {
       console.error('[BlogOS] Server key error:', e)
     }
   }
 
-  // 3️⃣ Groq API — ultra-rápida, tier gratuito (grok.com)
+  // 3️⃣ Groq API — ultra-rápida, tier gratuito
   const userGroqKey   = req.headers.get('x-groq-key') || ''
   const serverGroqKey = process.env.GROQ_API_KEY || ''
   const groqKey       = userGroqKey || serverGroqKey
@@ -171,7 +251,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // 4️⃣ Gemini API — gratuito (aistudio.google.com)
+  // 4️⃣ Gemini API — gratuito (actualizado a 2.0 flash)
   const userGemKey   = req.headers.get('x-gemini-key') || ''
   const serverGemKey = process.env.GEMINI_API_KEY || ''
   const gemKey       = userGemKey || serverGemKey
@@ -179,7 +259,7 @@ export async function POST(req: NextRequest) {
     try {
       const prompt = buildPrompt(mode, lastMsg, profile)
       const text   = await callGemini(prompt, gemKey)
-      return NextResponse.json({ text, model: 'gemini/1.5-flash' })
+      return NextResponse.json({ text, model: 'gemini/2.0-flash-exp' })
     } catch (e) {
       console.error('[BlogOS] Gemini error:', e)
     }
@@ -197,7 +277,7 @@ export async function POST(req: NextRequest) {
       })
       if (res.ok) {
         const data = await res.json()
-        return NextResponse.json({ ...data, model: `${MODEL} (proxy)` })
+        return NextResponse.json({ ...data, model: `${model} (proxy)` })
       }
     } catch (e) {
       console.error('[BlogOS] Proxy error:', e)
@@ -211,20 +291,21 @@ export async function POST(req: NextRequest) {
     const { default: path } = await import('path')
     const { default: os } = await import('os')
 
-    const CLAUDE_BIN = '/home/devrel-frutero/.local/bin/claude'
+    const CLAUDE_BIN = process.env.CLAUDE_CLI_PATH || '/home/devrel-frutero/.local/bin/claude'
     if (fs.existsSync(CLAUDE_BIN)) {
       const prompt  = buildPrompt(mode, lastMsg, profile)
       const tmpFile = path.join(os.tmpdir(), `blogos-${Date.now()}.txt`)
       fs.writeFileSync(tmpFile, prompt, 'utf8')
 
-      const { ANTHROPIC_API_KEY: _k, ...cleanEnv } = process.env as Record<string, string>
+      const cleanEnv: NodeJS.ProcessEnv = { ...process.env }
+      delete cleanEnv.ANTHROPIC_API_KEY
       const text = await new Promise<string>((resolve, reject) => {
         const proc = spawn('bash', ['-c', `cat "${tmpFile}" | "${CLAUDE_BIN}" --print`], {
           timeout: 35000,
           env: {
             ...cleanEnv,
-            HOME: '/home/devrel-frutero',
-            PATH: '/home/devrel-frutero/.local/bin:/home/devrel-frutero/.nvm/versions/node/v24.13.1/bin:/usr/local/bin:/usr/bin:/bin',
+            HOME: process.env.HOME || '/home/devrel-frutero',
+            PATH: `${process.env.HOME || '/home/devrel-frutero'}/.local/bin:${process.env.HOME || '/home/devrel-frutero'}/.nvm/versions/node/v24.13.1/bin:/usr/local/bin:/usr/bin:/bin`,
           },
         })
         let stdout = ''
@@ -241,12 +322,12 @@ export async function POST(req: NextRequest) {
           reject(err)
         })
       })
-      return NextResponse.json({ text, model: `${MODEL} (oauth)` })
+      return NextResponse.json({ text, model: `${model} (oauth)` })
     }
   } catch (e) {
     console.error('[BlogOS] Claude CLI error:', e)
   }
 
-  // 7️⃣ Mock inteligente — siempre funciona, nunca muestra errores
+  // 7️⃣ Mock inteligente — siempre funciona
   return NextResponse.json(getFallback(mode, lastMsg, profile))
 }

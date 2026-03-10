@@ -7,6 +7,7 @@ import {
   Zap, Star, Network, Anchor, Share2, BarChart2,
   Flame, BookOpen, Target, Sparkles, AlertCircle
 } from 'lucide-react'
+import { DashboardSkeleton } from './components/SkeletonCard'
 
 const TIPS = [
   '💡 Los mejores blogs responden una pregunta que el lector ni sabía que tenía.',
@@ -91,7 +92,7 @@ export default function Dashboard() {
     setTip(TIPS[Math.floor(Math.random() * TIPS.length)])
   }, [])
 
-  if (!profile) return null
+  if (!profile) return <DashboardSkeleton />
 
   const hour     = new Date().getHours()
   const greeting = hour < 12 ? 'Buenos días' : hour < 18 ? 'Buenas tardes' : 'Buenas noches'
