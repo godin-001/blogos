@@ -227,7 +227,7 @@ Responde en texto directo, máximo 4-5 oraciones. Como mentor que conoce el nego
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div>
               <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
-                HIPÓTESIS * — "Si hago X, entonces Y porque Z"
+                HIPÓTESIS * — &ldquo;Si hago X, entonces Y porque Z&rdquo;
               </label>
               <input className="input" value={form.hipotesis} onChange={e => setForm({ ...form, hipotesis: e.target.value })}
                 placeholder="Si publico 3x/semana, el tráfico aumentará 20% porque más contenido = más keywords" />

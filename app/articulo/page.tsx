@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Sparkles, Check, Copy, Download, Save, ChevronDown, ChevronUp, Loader2, AlertCircle, X } from 'lucide-react'
-import { callChat, getStoredKeys, getProfile as getProfileFn } from '@/lib/api'
+import { callChat, getProfile as getProfileFn } from '@/lib/api'
 import NewsletterSend from '@/app/components/NewsletterSend'
 import MetodologiasPicker from './MetodologiasPicker'
 import type { Metodologia } from './metodologias'

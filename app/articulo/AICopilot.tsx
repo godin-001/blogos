@@ -183,7 +183,7 @@ export default function AICopilot({ article, onApply }: Props) {
           {(result as Array<{estilo:string;hook:string;por_que_engancha:string}>).map((h, i) => (
             <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px' }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', marginBottom: 6, textTransform: 'uppercase' }}>{h.estilo}</div>
-              <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.7, fontStyle: 'italic', marginBottom: 6 }}>"{h.hook}"</div>
+              <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.7, fontStyle: 'italic', marginBottom: 6 }}>&ldquo;{h.hook}&rdquo;</div>
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>💡 {h.por_que_engancha}</div>
               <div style={{ display: 'flex', gap: 6 }}>
                 <CopyBtn text={h.hook} k={`h${i}`} />
@@ -202,7 +202,7 @@ export default function AICopilot({ article, onApply }: Props) {
           {(result as Array<{objetivo:string;cta:string;contexto:string}>).map((c, i) => (
             <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px' }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#10b981', textTransform: 'uppercase', marginBottom: 4 }}>{c.objetivo}</div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>"{c.cta}"</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>&ldquo;{c.cta}&rdquo;</div>
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>{c.contexto}</div>
               <div style={{ display: 'flex', gap: 6 }}>
                 <CopyBtn text={c.cta} k={`c${i}`} />

@@ -4,10 +4,10 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import {
   BookOpen, Flame, Target, Clock, ArrowRight, Pen,
-  ChevronDown, ChevronUp, RefreshCw, Sparkles, X,
-  TrendingUp, Calendar, Star, Zap, Brain, MessageSquare
+  ChevronDown, ChevronUp, RefreshCw, X,
+  Star, Brain, MessageSquare
 } from 'lucide-react'
-import { getStoredKeys, getProfile } from '@/lib/api'
+import { getStoredKeys } from '@/lib/api'
 
 type Article = {
   id: string
@@ -402,6 +402,7 @@ export default function MiBlogPage() {
     const h = JSON.parse(localStorage.getItem('blogos_preguntas_historial') || '[]')
     setHistorial(h)
     fetchPregunta(h, p ? JSON.parse(p) : null)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const fetchPregunta = useCallback(async (hist: string[], prof: Record<string, string> | null) => {

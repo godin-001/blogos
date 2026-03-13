@@ -211,7 +211,7 @@ Responde SOLO en JSON sin markdown:
                   background: 'rgba(0,0,0,0.15)', borderRadius: 10, marginBottom: 12,
                   borderLeft: `2px solid ${formula.color}40`,
                 }}>
-                  "{h.hook}"
+                  &ldquo;{h.hook}&rdquo;
                 </div>
 
                 <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>

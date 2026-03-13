@@ -7,7 +7,7 @@ const MODEL = 'llama-3.1-70b-versatile'
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { messages, mode } = body
+    const { messages } = body
 
     // Intentar clave del usuario primero
     const userKey = req.headers.get('x-groq-key') || ''

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Lightbulb, Sparkles, Bookmark, BookmarkCheck, TrendingUp, RefreshCw, Pen, Trash2, Filter, Newspaper } from 'lucide-react'
 import Link from 'next/link'
-import { callChat, callTendencias, getProfile } from '@/lib/api'
+import { callChat, callTendencias } from '@/lib/api'
 
 type Idea = {
   id: string
@@ -66,6 +66,7 @@ export default function IdeasPage() {
     if (tab === 'tendencias' && tendencias.length === 0) {
       loadTendencias()
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab])
 
   const generateIdeas = async () => {
@@ -242,7 +243,7 @@ export default function IdeasPage() {
           ) : !loading && (
             <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
               <Lightbulb size={48} style={{ margin: '0 auto 16px', opacity: 0.3 }} />
-              <p style={{ fontSize: 15 }}>Haz clic en "Generar" para obtener ideas personalizadas</p>
+              <p style={{ fontSize: 15 }}>Haz clic en &ldquo;Generar&rdquo; para obtener ideas personalizadas</p>
               <p style={{ fontSize: 13, marginTop: 6, opacity: 0.7 }}>Usaremos tu perfil de escritor para darte ideas relevantes</p>
             </div>
           )}
