@@ -99,3 +99,4 @@ jobs:
 
       - name: Deploy to Vercel (Production)
         run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+# BlogOS CI/CD — configurado 2026-03-13
