@@ -100,6 +100,7 @@ export default function ArticuloPage() {
   const [coverImage, setCoverImage] = useState('')
   const [showUnsplash, setShowUnsplash] = useState(false)
   const [showNewsletter, setShowNewsletter] = useState(false)
+  const [aiImageLoading, setAiImageLoading] = useState(false)
   const [showThreadModal, setShowThreadModal] = useState(false)
   const [threadTweets, setThreadTweets] = useState<string[]>([])
   const [threadLoading, setThreadLoading] = useState(false)
@@ -291,6 +292,35 @@ Solo el contenido de la sección, sin explicaciones adicionales.`
     }
   }
 
+  const generateAIImage = async () => {
+    if (!content.titulo?.trim()) {
+      setGlobalMsg('Agrega un título antes de generar la imagen')
+      setTimeout(() => setGlobalMsg(''), 3000)
+      return
+    }
+    setAiImageLoading(true)
+    try {
+      const prompt = `${content.titulo}. ${profile?.niche || 'marketing digital'}. ${content.gancho?.slice(0, 80) || ''}`
+      const res = await fetch('/api/imagen-ia', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, width: 1200, height: 630 }),
+      })
+      const data = await res.json()
+      if (data.url) {
+        setCoverImage(data.url)
+        setGlobalMsg('🎨 Imagen generada con IA')
+        setTimeout(() => setGlobalMsg(''), 3000)
+      } else {
+        throw new Error(data.error || 'Sin URL')
+      }
+    } catch {
+      setGlobalMsg('Error generando imagen. Intenta de nuevo.')
+      setTimeout(() => setGlobalMsg(''), 3000)
+    }
+    setAiImageLoading(false)
+  }
+
   return (
     <div className="animate-fade-in">
       {/* Header */}
@@ -379,6 +409,17 @@ Solo el contenido de la sección, sin explicaciones adicionales.`
         <button className="btn-secondary" onClick={() => setShowUnsplash(!showUnsplash)}
           style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           🖼️ Portada
+        </button>
+        <button
+          className="btn-secondary"
+          onClick={generateAIImage}
+          disabled={aiImageLoading}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, borderColor: aiImageLoading ? undefined : 'rgba(124,58,237,0.4)' }}
+        >
+          {aiImageLoading
+            ? <span className="spin" style={{ fontSize: 13 }}>⏳</span>
+            : '🎨'}
+          {aiImageLoading ? 'Generando...' : 'Imagen IA'}
         </button>
         <button className="btn-secondary" onClick={generateThread} disabled={threadLoading || !content.titulo?.trim()}
           style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
