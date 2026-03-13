@@ -6,6 +6,7 @@ import { callChat, getStoredKeys, getProfile as getProfileFn } from '@/lib/api'
 import NewsletterSend from '@/app/components/NewsletterSend'
 import MetodologiasPicker from './MetodologiasPicker'
 import type { Metodologia } from './metodologias'
+import AICopilot from './AICopilot'
 
 type Section = {
   id: string
@@ -325,6 +326,15 @@ Solo el contenido de la sección, sin explicaciones adicionales.`
       <MetodologiasPicker
         selectedId={metodologiaId}
         onSelect={handleSelectMetodologia}
+      />
+
+      {/* AI Copilot */}
+      <AICopilot
+        article={content as { titulo?: string; gancho?: string; subtitulos?: string; ejemplos?: string; reflexion?: string; cta?: string }}
+        onApply={(field, value) => {
+          setContent(prev => ({ ...prev, [field]: value }))
+          setIsDirty(true)
+        }}
       />
 
       {/* Progress */}

@@ -2,8 +2,8 @@
  * BlogOS API helper — injects stored API keys into every request
  */
 
-export function getStoredKeys(): { anthropic: string; serper: string; newsapi: string; groq: string; gemini: string; openai: string; mistral: string; unsplash: string; serpapi: string; resend: string; convertkit: string } {
-  if (typeof window === 'undefined') return { anthropic: '', serper: '', newsapi: '', groq: '', gemini: '', openai: '', mistral: '', unsplash: '', serpapi: '', resend: '', convertkit: '' }
+export function getStoredKeys(): { anthropic: string; serper: string; newsapi: string; groq: string; gemini: string; openai: string; mistral: string; serpapi: string; resend: string; convertkit: string } {
+  if (typeof window === 'undefined') return { anthropic: '', serper: '', newsapi: '', groq: '', gemini: '', openai: '', mistral: '', serpapi: '', resend: '', convertkit: '' }
   const stored = localStorage.getItem('blogos_api_keys')
   const parsed = stored ? JSON.parse(stored) : {}
   return {
@@ -14,7 +14,6 @@ export function getStoredKeys(): { anthropic: string; serper: string; newsapi: s
     gemini:     parsed.gemini     || '',
     openai:     parsed.openai     || '',
     mistral:    parsed.mistral    || '',
-    unsplash:   parsed.unsplash   || '',
     serpapi:    parsed.serpapi    || '',
     resend:     parsed.resend     || '',
     convertkit: parsed.convertkit || '',
