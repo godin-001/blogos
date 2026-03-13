@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { Sparkles, Check, Copy, Download, Save, ChevronDown, ChevronUp, Loader2, AlertCircle, X } from 'lucide-react'
 import { callChat, getStoredKeys, getProfile as getProfileFn } from '@/lib/api'
-import UnsplashPicker from '@/app/components/UnsplashPicker'
 import NewsletterSend from '@/app/components/NewsletterSend'
 
 type Section = {
@@ -74,7 +73,6 @@ type Article = {
   ejemplos: string
   reflexion: string
   cta: string
-  coverImage?: string
   createdAt: string
 }
 
@@ -97,10 +95,7 @@ export default function ArticuloPage() {
   const [globalMsg, setGlobalMsg] = useState('')
   const [autoSaveMsg, setAutoSaveMsg] = useState('')
   const [isDirty, setIsDirty] = useState(false)
-  const [coverImage, setCoverImage] = useState('')
-  const [showUnsplash, setShowUnsplash] = useState(false)
   const [showNewsletter, setShowNewsletter] = useState(false)
-  const [aiImageLoading, setAiImageLoading] = useState(false)
   const [showThreadModal, setShowThreadModal] = useState(false)
   const [threadTweets, setThreadTweets] = useState<string[]>([])
   const [threadLoading, setThreadLoading] = useState(false)
@@ -223,8 +218,7 @@ Solo el contenido de la sección, sin explicaciones adicionales.`
     const articles = JSON.parse(localStorage.getItem('blogos_articles') || '[]')
     const article: Article = {
       id: `art-${Date.now()}`,
-      ...content as Omit<Article, 'id' | 'createdAt' | 'coverImage'>,
-      coverImage: coverImage || undefined,
+      ...content as Omit<Article, 'id' | 'createdAt'>,
       createdAt: new Date().toISOString(),
     }
     articles.push(article)
@@ -292,35 +286,6 @@ Solo el contenido de la sección, sin explicaciones adicionales.`
     }
   }
 
-  const generateAIImage = async () => {
-    if (!content.titulo?.trim()) {
-      setGlobalMsg('Agrega un título antes de generar la imagen')
-      setTimeout(() => setGlobalMsg(''), 3000)
-      return
-    }
-    setAiImageLoading(true)
-    try {
-      const prompt = `${content.titulo}. ${profile?.niche || 'marketing digital'}. ${content.gancho?.slice(0, 80) || ''}`
-      const res = await fetch('/api/imagen-ia', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, width: 1200, height: 630 }),
-      })
-      const data = await res.json()
-      if (data.url) {
-        setCoverImage(data.url)
-        setGlobalMsg('🎨 Imagen generada con IA')
-        setTimeout(() => setGlobalMsg(''), 3000)
-      } else {
-        throw new Error(data.error || 'Sin URL')
-      }
-    } catch {
-      setGlobalMsg('Error generando imagen. Intenta de nuevo.')
-      setTimeout(() => setGlobalMsg(''), 3000)
-    }
-    setAiImageLoading(false)
-  }
-
   return (
     <div className="animate-fade-in">
       {/* Header */}
@@ -343,19 +308,6 @@ Solo el contenido de la sección, sin explicaciones adicionales.`
         }}>
           <AlertCircle size={14} />
           {globalMsg}
-        </div>
-      )}
-
-      {/* Cover Image */}
-      {coverImage && (
-        <div style={{ marginBottom: 16, borderRadius: 12, overflow: 'hidden', position: 'relative' }}>
-          <img src={coverImage} alt="Portada" style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }} />
-          <button onClick={() => setCoverImage('')} style={{
-            position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.6)', border: 'none',
-            borderRadius: '50%', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-          }}>
-            <X size={14} color="white" />
-          </button>
         </div>
       )}
 
@@ -406,21 +358,7 @@ Solo el contenido de la sección, sin explicaciones adicionales.`
           {showPreview ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
           {showPreview ? 'Ocultar preview' : 'Ver preview'}
         </button>
-        <button className="btn-secondary" onClick={() => setShowUnsplash(!showUnsplash)}
-          style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          🖼️ Portada
-        </button>
-        <button
-          className="btn-secondary"
-          onClick={generateAIImage}
-          disabled={aiImageLoading}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, borderColor: aiImageLoading ? undefined : 'rgba(124,58,237,0.4)' }}
-        >
-          {aiImageLoading
-            ? <span className="spin" style={{ fontSize: 13 }}>⏳</span>
-            : '🎨'}
-          {aiImageLoading ? 'Generando...' : 'Imagen IA'}
-        </button>
+
         <button className="btn-secondary" onClick={generateThread} disabled={threadLoading || !content.titulo?.trim()}
           style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           {threadLoading ? <Loader2 size={14} className="animate-spin" /> : null}
@@ -449,17 +387,6 @@ Solo el contenido de la sección, sin explicaciones adicionales.`
           )}
         </div>
       </div>
-
-      {/* Unsplash Picker */}
-      {showUnsplash && (
-        <UnsplashPicker
-          defaultQuery={content.titulo || profile?.niche || ''}
-          onSelect={(url) => {
-            setCoverImage(url)
-            setShowUnsplash(false)
-          }}
-        />
-      )}
 
       {/* Newsletter Send */}
       {showNewsletter && (
@@ -512,11 +439,6 @@ Solo el contenido de la sección, sin explicaciones adicionales.`
       {/* Preview */}
       {showPreview && (
         <div className="card" style={{ padding: '20px 24px', marginBottom: 20 }}>
-          {coverImage && (
-            <div style={{ marginBottom: 16, borderRadius: 8, overflow: 'hidden' }}>
-              <img src={coverImage} alt="Portada" style={{ width: '100%', height: 180, objectFit: 'cover', display: 'block' }} />
-            </div>
-          )}
           <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', marginBottom: 12 }}>
             {content.titulo || '(Sin título)'}
           </h2>

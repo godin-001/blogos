@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Key, Check, Eye, EyeOff, ExternalLink, Zap, AlertCircle, CheckCircle, Loader2, Wifi, WifiOff } from 'lucide-react'
 
 type ApiStatus = 'idle' | 'testing' | 'ok' | 'error'
-type ApiConfig = { anthropic: string; serper: string; newsapi: string; groq: string; gemini: string; openai: string; mistral: string; unsplash: string; serpapi: string; resend: string; convertkit: string }
+type ApiConfig = { anthropic: string; serper: string; newsapi: string; groq: string; gemini: string; openai: string; mistral: string; serpapi: string; resend: string; convertkit: string }
 type HealthStatus = { status: 'live' | 'demo' | 'checking'; mode: string; latency?: number }
 
 const API_INFO = [
@@ -44,13 +44,6 @@ const API_INFO = [
     getKey: 'https://console.mistral.ai/api-keys', placeholder: 'tu-key-mistral...',
   },
   {
-    id: 'unsplash' as keyof ApiConfig,
-    name: 'Unsplash',         emoji: '🖼️', color: '#111827', badge: 'Gratis',
-    desc: 'Busca imágenes de portada de alta calidad en Unsplash. Millones de fotos gratuitas.',
-    features: ['Fotos HD gratuitas', 'Búsqueda por tema', 'Crédito automático', 'Portadas para blog', '50 req/hora gratis'],
-    getKey: 'https://unsplash.com/developers', placeholder: 'tu-access-key-unsplash...',
-  },
-  {
     id: 'serper' as keyof ApiConfig,
     name: 'Serper (Google)',    emoji: '🔍', color: '#10b981', badge: 'SEO',
     desc: 'Datos reales de Google: posicionamiento de competidores, keywords relacionadas y noticias de tu nicho.',
@@ -88,7 +81,7 @@ const API_INFO = [
 ]
 
 export default function ConfiguracionPage() {
-  const [keys, setKeys]     = useState<ApiConfig>({ anthropic: '', serper: '', newsapi: '', groq: '', gemini: '', openai: '', mistral: '', unsplash: '', serpapi: '', resend: '', convertkit: '' })
+  const [keys, setKeys]     = useState<ApiConfig>({ anthropic: '', serper: '', newsapi: '', groq: '', gemini: '', openai: '', mistral: '', serpapi: '', resend: '', convertkit: '' })
   const [show, setShow]     = useState<Record<string, boolean>>({})
   const [status, setStatus] = useState<Record<string, ApiStatus>>({})
   const [saved, setSaved]   = useState(false)
@@ -172,14 +165,6 @@ export default function ConfiguracionPage() {
         })
         const d = await res.json()
         ok = !d.error && !!d.text
-      } else if (apiId === 'unsplash') {
-        const res = await fetch('/api/unsplash', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-unsplash-key': key },
-          body: JSON.stringify({ query: 'test' }),
-        })
-        const d = await res.json()
-        ok = !d.error && !d.demo
       } else if (apiId === 'serpapi') {
         const res = await fetch('/api/serp', {
           method: 'POST',
@@ -425,7 +410,7 @@ export default function ConfiguracionPage() {
         <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 14 }}>📖 Guía de configuración</h3>
         {[
           { n: '1', title: 'Anthropic (más importante)', color: '#7c3aed', desc: 'console.anthropic.com → API Keys → Create Key. Muy barato (centavos por uso). Activa toda la IA generativa.' },
-          { n: '2', title: 'OpenAI (alternativa + DALL-E)', color: '#10a37f', desc: 'platform.openai.com → API Keys. GPT-4o como alternativa y DALL-E 3 para portadas con IA.' },
+          { n: '2', title: 'OpenAI (alternativa)', color: '#10a37f', desc: 'platform.openai.com → API Keys. GPT-4o como alternativa a Claude para generación de texto.' },
           { n: '3', title: 'Groq o Gemini (gratis)', color: '#06b6d4', desc: 'Ambas gratuitas. Groq es ultra-rápida. Gemini tiene 15 req/min gratis. Ideal como fallback.' },
           { n: '4', title: 'Serper o SerpApi (SEO)',   color: '#10b981', desc: 'Datos reales de Google. Serper: serper.dev. SerpApi: serpapi.com. Activa investigación SEO real.' },
           { n: '5', title: 'Resend + ConvertKit (email)', color: '#fb6970', desc: 'Resend para enviar newsletters. ConvertKit para gestionar suscriptores. Ambas con tier gratis.' },
