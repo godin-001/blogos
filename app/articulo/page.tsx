@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { Sparkles, Check, Copy, Download, Save, ChevronDown, ChevronUp, Loader2, AlertCircle, X } from 'lucide-react'
 import { callChat, getStoredKeys, getProfile as getProfileFn } from '@/lib/api'
 import NewsletterSend from '@/app/components/NewsletterSend'
+import MetodologiasPicker from './MetodologiasPicker'
+import type { Metodologia } from './metodologias'
 
 type Section = {
   id: string
@@ -96,6 +98,7 @@ export default function ArticuloPage() {
   const [autoSaveMsg, setAutoSaveMsg] = useState('')
   const [isDirty, setIsDirty] = useState(false)
   const [showNewsletter, setShowNewsletter] = useState(false)
+  const [metodologiaId, setMetodologiaId] = useState<string | null>(null)
   const [showThreadModal, setShowThreadModal] = useState(false)
   const [threadTweets, setThreadTweets] = useState<string[]>([])
   const [threadLoading, setThreadLoading] = useState(false)
@@ -286,6 +289,13 @@ Solo el contenido de la sección, sin explicaciones adicionales.`
     }
   }
 
+  const handleSelectMetodologia = (m: Metodologia) => {
+    setMetodologiaId(m.id)
+    const estructura = m.estructura.join('\n')
+    setContent(prev => ({ ...prev, subtitulos: estructura }))
+    setIsDirty(true)
+  }
+
   return (
     <div className="animate-fade-in">
       {/* Header */}
@@ -310,6 +320,12 @@ Solo el contenido de la sección, sin explicaciones adicionales.`
           {globalMsg}
         </div>
       )}
+
+      {/* Metodologías */}
+      <MetodologiasPicker
+        selectedId={metodologiaId}
+        onSelect={handleSelectMetodologia}
+      />
 
       {/* Progress */}
       <div className="card" style={{ padding: '16px 20px', marginBottom: 20 }}>
