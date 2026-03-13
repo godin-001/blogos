@@ -99,7 +99,7 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
             background: 'rgba(124,58,237,0.1)',
             borderRadius: 8, border: '1px solid rgba(124,58,237,0.2)',
           }}>
-            <div style={{ fontSize: 12, color: '#a78bfa', fontWeight: 600 }}>✍️ {profile.name}</div>
+            <div style={{ fontSize: 12, color: '#7c3aed', fontWeight: 600 }}>✍️ {profile.name}</div>
             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{profile.niche}</div>
           </div>
         )}
