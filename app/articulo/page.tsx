@@ -7,6 +7,7 @@ import NewsletterSend from '@/app/components/NewsletterSend'
 import MetodologiasPicker from './MetodologiasPicker'
 import type { Metodologia } from './metodologias'
 import AICopilot from './AICopilot'
+import ArticuloFinal from './ArticuloFinal'
 
 type Section = {
   id: string
@@ -433,6 +434,12 @@ DEVUELVE SOLO el contenido de la sección. Sin etiquetas, sin explicaciones.`
           setContent(prev => ({ ...prev, [field]: value }))
           setIsDirty(true)
         }}
+      />
+
+      {/* Artículo Final Publicable */}
+      <ArticuloFinal
+        sections={content as Record<string, string>}
+        metodologia={metodologiaId}
       />
 
       {/* Progress */}

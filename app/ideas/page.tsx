@@ -12,6 +12,7 @@ type Idea = {
   tipo: string
   potencial: string
   keywords: string[]
+  por_que_funcionara?: string
   saved?: boolean
   createdAt?: string
 }
@@ -371,9 +372,14 @@ function IdeaCard({ idea, isSaved, onSave, deleteMode }: {
           <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 6, lineHeight: 1.4 }}>
             {idea.titulo}
           </h3>
-          <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: 10 }}>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: idea.por_que_funcionara ? 6 : 10 }}>
             {idea.gancho}
           </p>
+          {idea.por_que_funcionara && (
+            <div style={{ fontSize: 11, color: '#7c3aed', fontStyle: 'italic', marginBottom: 10, padding: '4px 10px', background: 'rgba(124,58,237,0.06)', borderRadius: 6, borderLeft: '2px solid rgba(124,58,237,0.3)' }}>
+              💡 {idea.por_que_funcionara}
+            </div>
+          )}
           {idea.keywords && idea.keywords.length > 0 && (
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {idea.keywords.map(kw => (
