@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Sparkles, Check, Copy, Download, Save, ChevronDown, ChevronUp, Loader2, AlertCircle, X } from 'lucide-react'
-import { callChat, getProfile as getProfileFn } from '@/lib/api'
+import { useState, useEffect, useRef } from 'react'
+import { Sparkles, Check, Copy, Download, Save, ChevronDown, ChevronUp, Loader2, AlertCircle, X, Wand2 } from 'lucide-react'
+import { getProfile as getProfileFn } from '@/lib/api'
 import NewsletterSend from '@/app/components/NewsletterSend'
 import MetodologiasPicker from './MetodologiasPicker'
 import type { Metodologia } from './metodologias'
@@ -92,6 +92,10 @@ export default function ArticuloPage() {
   const [aiLoading, setAiLoading] = useState<Record<string, boolean>>({})
   const [aiError, setAiError] = useState<Record<string, string>>({})
   const [profile, setProfile] = useState<Record<string, string> | null>(null)
+  const [generatingAll, setGeneratingAll] = useState(false)
+  const [generateProgress, setGenerateProgress] = useState<string>('')
+  const [seoScore, setSeoScore] = useState<number | null>(null)
+  const seoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [saved, setSaved] = useState(false)
   const [copied, setCopied] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
@@ -154,63 +158,157 @@ export default function ArticuloPage() {
 
   // Marcar como dirty cuando cambia el contenido
   const handleContentChange = (sectionId: string, value: string) => {
-    setContent(prev => ({ ...prev, [sectionId]: value }))
+    setContent(prev => {
+      const next = { ...prev, [sectionId]: value }
+      updateSeoScore(next)
+      return next
+    })
     setIsDirty(true)
   }
 
   const completedSections = SECTIONS.filter(s => content[s.id]?.trim().length > 0).length
   const progress = (completedSections / SECTIONS.length) * 100
 
-  const generateWithAI = async (sectionId: string) => {
+  // Genera una sección con contexto completo del artículo + streaming
+  const generateWithAI = async (sectionId: string, currentContent?: Record<string, string>) => {
+    const ctx = currentContent || content
     setAiLoading(prev => ({ ...prev, [sectionId]: true }))
     setAiError(prev => ({ ...prev, [sectionId]: '' }))
+
+    const niche   = profile?.niche    || 'marketing digital'
+    const audience= profile?.audience || 'emprendedores'
+    const style   = profile?.style    || 'profesional pero cercano'
+
+    // Contexto completo del artículo para que la IA tenga coherencia total
+    const articleContext = SECTIONS
+      .filter(s => s.id !== sectionId && ctx[s.id]?.trim())
+      .map(s => `${s.title.toUpperCase()}: ${ctx[s.id]}`)
+      .join('\n\n')
+
+    const sectionMeta: Record<string, { instruccion: string; palabras: string }> = {
+      titulo:    { instruccion: 'Genera UN título magnético que genere curiosidad, use números o contraste, y sea imposible de ignorar.', palabras: '10-15 palabras' },
+      gancho:    { instruccion: 'Escribe las primeras 3-4 oraciones del artículo. Comienza con una historia, dato impactante o pregunta que genere tensión inmediata. Aplica PAS o In Medias Res.', palabras: '60-90 palabras' },
+      subtitulos:{ instruccion: 'Crea 5-7 subtítulos H2 con la estructura completa del artículo. Cada subtítulo debe ser curioso, accionable y escaneable. Numera cada uno.', palabras: '7-10 palabras por subtítulo' },
+      ejemplos:  { instruccion: 'Escribe 2-3 ejemplos concretos, historias o casos reales que ilustren los puntos del artículo. Usa nombres reales, números y detalles específicos.', palabras: '150-200 palabras' },
+      reflexion: { instruccion: 'Escribe el párrafo de cierre que cambia la perspectiva del lector. Conecta con el gancho inicial y deja un insight memorable y único.', palabras: '80-120 palabras' },
+      cta:       { instruccion: 'Escribe UN llamado a la acción claro, específico y urgente. Usa verbo de acción. Explica el beneficio de actuar ahora.', palabras: '20-40 palabras' },
+    }
+
+    const meta  = sectionMeta[sectionId] || { instruccion: 'Genera el contenido de esta sección.', palabras: '150 palabras' }
+    const prompt = `CONTEXTO DEL ARTÍCULO:
+Nicho: ${niche} | Audiencia: ${audience} | Estilo: ${style}
+${articleContext ? `\nRESTO DEL ARTÍCULO YA ESCRITO:\n${articleContext}\n` : ''}
+TAREA: Genera la sección "${sectionId.toUpperCase()}" del artículo.
+${meta.instruccion}
+Longitud objetivo: ${meta.palabras}.
+Mantén coherencia con el resto del artículo.
+Tono: ${style}.
+DEVUELVE SOLO el contenido de la sección. Sin etiquetas, sin explicaciones.`
+
     try {
-      const contextMsg = `Artículo: "${content.titulo || 'Sin título aún'}"
-Nicho: ${profile?.niche || 'marketing digital'}
-Sección a generar: ${sectionId}
-Contexto del artículo:
-- Título: ${content.titulo}
-- Gancho: ${content.gancho}
-- Subtítulos: ${content.subtitulos}
+      const keys = (() => {
+        if (typeof window === 'undefined') return {} as Record<string,string>
+        const s = localStorage.getItem('blogos_api_keys')
+        return s ? JSON.parse(s) : {}
+      })()
 
-Genera contenido de alta calidad para la sección "${sectionId}".
-Máximo 200 palabras. Estilo: ${profile?.style || 'profesional pero cercano'}.
-Solo el contenido de la sección, sin explicaciones adicionales.`
+      const headers: Record<string, string> = { 'Content-Type': 'application/json', 'x-stream': 'true' }
+      if (keys.anthropic) headers['x-anthropic-key'] = keys.anthropic
+      if (keys.groq)      headers['x-groq-key']      = keys.groq
+      if (keys.gemini)    headers['x-gemini-key']     = keys.gemini
+      if (keys.openai)    headers['x-openai-key']     = keys.openai
+      if (keys.mistral)   headers['x-mistral-key']    = keys.mistral
 
-      const data = await callChat({
-        mode: 'estructura',
-        profile,
-        messages: [{ role: 'user', content: contextMsg }],
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ messages: [{ role: 'user', content: prompt }], mode: 'estructura', profile }),
       })
 
-      if (data?.text) {
-        setContent(prev => ({ ...prev, [sectionId]: data.text.trim() }))
-      } else {
-        // fallback de mock
-        const mocks: Record<string, string> = {
-          titulo: content.titulo || '7 estrategias de content marketing que duplican tu tráfico en 90 días',
-          gancho: 'El 80% de los bloggers abandonan en los primeros 6 meses. No porque no tengan talento—sino porque nadie les enseñó el sistema correcto. Hoy te doy exactamente ese sistema.',
-          subtitulos: '1. Por qué el contenido genérico ya no funciona\n2. La estrategia del pillar content\n3. Cómo distribuir un artículo en 7 plataformas\n4. El error más costoso del content marketing\n5. Tu plan de los próximos 30 días',
-          ejemplos: 'Un cliente mío, Carlos (agencia de marketing en CDMX), pasó de 200 a 15,000 visitas mensuales en 4 meses usando exactamente estos principios. Su secreto: un solo artículo pilar de 3,000 palabras del que derivó 8 piezas de contenido más corto.',
-          reflexion: 'El content marketing no es sobre crear más contenido. Es sobre crear el contenido correcto, para la persona correcta, en el momento correcto. Cuando entiendas esto, todo cambia.',
-          cta: '¿Cuál de estas estrategias vas a implementar esta semana? Déjame tu respuesta en los comentarios.',
+      // Si streaming está disponible, leer token a token
+      if (res.headers.get('content-type')?.includes('text/event-stream')) {
+        const reader  = res.body!.getReader()
+        const decoder = new TextDecoder()
+        let accumulated = ''
+        setContent(prev => ({ ...prev, [sectionId]: '' }))
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          const chunk = decoder.decode(value)
+          const lines = chunk.split('\n')
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6)
+              if (data === '[DONE]') break
+              try {
+                const { chunk: token } = JSON.parse(data)
+                accumulated += token
+                setContent(prev => ({ ...prev, [sectionId]: accumulated }))
+              } catch {}
+            }
+          }
         }
-        setContent(prev => ({ ...prev, [sectionId]: mocks[sectionId] || 'Contenido generado.' }))
+        setIsDirty(true)
+      } else {
+        // Fallback sin streaming
+        const data = await res.json()
+        if (data?.text) {
+          setContent(prev => ({ ...prev, [sectionId]: data.text.trim() }))
+          setIsDirty(true)
+        }
+        if (data?.demo) {
+          setAiError(prev => ({ ...prev, [sectionId]: 'Modo demo — configura tu API en Configuración' }))
+        }
       }
     } catch {
-      setAiError(prev => ({ ...prev, [sectionId]: 'Usando ejemplo — IA temporalmente no disponible' }))
-      // Aún así colocar contenido de ejemplo
-      const mocks: Record<string, string> = {
-        titulo: '7 estrategias que duplican tu tráfico orgánico',
-        gancho: 'Hay un patrón que separa los blogs que generan $10K/mes de los que generan $0. Te lo voy a mostrar en menos de 5 minutos.',
-        subtitulos: '1. El error #1 que cometen el 90% de los bloggers\n2. La fórmula de los artículos virales\n3. Cómo convertir lectores en suscriptores\n4. Tu calendario editorial en 15 minutos',
-        ejemplos: 'Caso real: María duplicó su tráfico en 60 días publicando solo 1 artículo semanal—pero con esta metodología específica.',
-        reflexion: 'No necesitas más tiempo ni más ideas. Necesitas un sistema. Este es tu sistema.',
-        cta: 'Comparte este artículo con un blogger que lo necesite. Puede cambiar su negocio.',
-      }
-      setContent(prev => ({ ...prev, [sectionId]: mocks[sectionId] || 'Contenido de ejemplo.' }))
+      setAiError(prev => ({ ...prev, [sectionId]: 'Error al generar. Intenta de nuevo.' }))
     }
     setAiLoading(prev => ({ ...prev, [sectionId]: false }))
+  }
+
+  // Genera TODO el artículo sección por sección con contexto encadenado
+  const generateFullArticle = async () => {
+    if (!content.titulo?.trim()) {
+      setGlobalMsg('Escribe un título primero para generar el artículo completo')
+      setTimeout(() => setGlobalMsg(''), 3000)
+      return
+    }
+    setGeneratingAll(true)
+    const sectionsToGenerate = SECTIONS.filter(s => s.id !== 'titulo')
+    let accumulated = { ...content }
+
+    for (const section of sectionsToGenerate) {
+      setGenerateProgress(`Generando: ${section.emoji} ${section.title}...`)
+      await generateWithAI(section.id, accumulated)
+      // Leer el estado actualizado para encadenar contexto
+      accumulated = { ...accumulated, [section.id]: document.querySelector<HTMLTextAreaElement>(`[data-section="${section.id}"]`)?.value || accumulated[section.id] || '' }
+      await new Promise(r => setTimeout(r, 300))
+    }
+
+    setGenerateProgress('')
+    setGeneratingAll(false)
+    setGlobalMsg('🎉 Artículo generado completo')
+    setTimeout(() => setGlobalMsg(''), 3000)
+  }
+
+  // Score SEO en tiempo real (debounced 2s)
+  const updateSeoScore = (c: Record<string, string>) => {
+    if (seoTimer.current) clearTimeout(seoTimer.current)
+    seoTimer.current = setTimeout(() => {
+      const text = Object.values(c).join(' ')
+      const words = text.trim().split(/\s+/).filter(Boolean).length
+      let score = 0
+      if (c.titulo?.length > 20 && c.titulo?.length < 70) score += 20
+      if (c.gancho?.length > 50) score += 15
+      if (c.subtitulos?.split('\n').length >= 3) score += 15
+      if (c.ejemplos?.length > 100) score += 15
+      if (c.reflexion?.length > 50) score += 15
+      if (c.cta?.length > 20) score += 10
+      if (words > 300) score += 5
+      if (words > 600) score += 5
+      setSeoScore(Math.min(score, 100))
+    }, 1500)
   }
 
   const saveArticle = () => {
@@ -345,8 +443,24 @@ Solo el contenido de la sección, sin explicaciones adicionales.`
             {completedSections}/6 secciones {completedSections === 6 ? '✅ Completo' : ''}
           </span>
         </div>
-        <div className="progress-bar">
-          <div className="progress-bar-fill" style={{ width: `${progress}%` }} />
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 8 }}>
+          <div className="progress-bar" style={{ flex: 1 }}>
+            <div className="progress-bar-fill" style={{ width: `${progress}%` }} />
+          </div>
+          {seoScore !== null && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>SEO</span>
+              <div style={{
+                width: 36, height: 36, borderRadius: '50%', display: 'flex', alignItems: 'center',
+                justifyContent: 'center', fontWeight: 800, fontSize: 12,
+                background: seoScore >= 80 ? 'rgba(16,185,129,0.12)' : seoScore >= 50 ? 'rgba(245,158,11,0.12)' : 'rgba(239,68,68,0.12)',
+                color: seoScore >= 80 ? '#059669' : seoScore >= 50 ? '#d97706' : '#dc2626',
+                border: `2px solid ${seoScore >= 80 ? 'rgba(16,185,129,0.4)' : seoScore >= 50 ? 'rgba(245,158,11,0.4)' : 'rgba(239,68,68,0.4)'}`,
+              }}>
+                {seoScore}
+              </div>
+            </div>
+          )}
         </div>
         <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
           {SECTIONS.map(s => (
@@ -367,6 +481,23 @@ Solo el contenido de la sección, sin explicaciones adicionales.`
         <button className="btn-primary" onClick={saveArticle} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           {saved ? <Check size={15} /> : <Save size={15} />}
           {saved ? '¡Guardado!' : 'Guardar'}
+        </button>
+        <button
+          onClick={generateFullArticle}
+          disabled={generatingAll || !content.titulo?.trim()}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '10px 16px', borderRadius: 8, fontWeight: 700, fontSize: 13,
+            cursor: generatingAll || !content.titulo?.trim() ? 'not-allowed' : 'pointer',
+            background: generatingAll ? 'rgba(124,58,237,0.1)' : 'linear-gradient(135deg,#7c3aed,#ec4899)',
+            color: generatingAll ? '#7c3aed' : 'white',
+            border: generatingAll ? '1px solid rgba(124,58,237,0.3)' : 'none',
+            opacity: !content.titulo?.trim() ? 0.5 : 1,
+            transition: 'all 0.2s',
+          }}
+        >
+          {generatingAll ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
+          {generatingAll ? (generateProgress || 'Generando...') : '🪄 Generar artículo completo'}
         </button>
         <button className="btn-secondary" onClick={copyAll} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           {copied ? <Check size={15} /> : <Copy size={15} />}
@@ -552,6 +683,7 @@ Solo el contenido de la sección, sin explicaciones adicionales.`
                   onChange={e => handleContentChange(section.id, e.target.value)}
                   style={{ minHeight: section.id === 'subtitulos' || section.id === 'ejemplos' ? 160 : 120 }}
                   aria-label={`${section.title} — sección ${index + 1} de ${SECTIONS.length}`}
+                  data-section={section.id}
                 />
 
                 {/* Error inline */}
