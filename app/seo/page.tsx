@@ -1,8 +1,36 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { TrendingUp, Sparkles, Search, Copy, Check, AlertCircle, CheckCircle, ExternalLink, RefreshCw } from 'lucide-react'
 import { callChat, callSeoResearch, getStoredKeys } from '@/lib/api'
+
+function calcularDensidad(texto: string, keyword: string): number {
+  if (!texto.trim() || !keyword.trim()) return 0
+  const palabras = texto.toLowerCase().split(/\s+/).filter(w => w.length > 0)
+  if (palabras.length === 0) return 0
+  const kw = keyword.toLowerCase()
+  const ocurrencias = texto.toLowerCase().split(kw).length - 1
+  return Math.round((ocurrencias / palabras.length) * 1000) / 10
+}
+
+function DensidadIndicador({ densidad }: { densidad: number }) {
+  let color = '#ef4444'
+  let label = 'Muy baja'
+  let emoji = '🔴'
+  if (densidad >= 0.5 && densidad <= 1.5) { color = '#10b981'; label = 'Óptima'; emoji = '✅' }
+  else if (densidad > 1.5 && densidad <= 3) { color = '#f59e0b'; label = 'Alta'; emoji = '⚠️' }
+  else if (densidad > 3) { color = '#ef4444'; label = 'Exceso'; emoji = '🔴' }
+  return (
+    <div style={{
+      display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 12px',
+      borderRadius: 8, background: `${color}12`, border: `1px solid ${color}30`,
+    }}>
+      <span style={{ fontSize: 12 }}>{emoji}</span>
+      <span style={{ fontSize: 12, fontWeight: 700, color }}>Densidad keyword: {densidad}%</span>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>— {label}</span>
+    </div>
+  )
+}
 
 type SeoResult = {
   score: number
@@ -30,7 +58,7 @@ const COPY_FORMULAS = [
     name: 'PAS',
     full: 'Problema → Agitación → Solución',
     emoji: '🎯',
-    color: '#7c3aed',
+    color: '#6366f1',
     desc: 'Identifica el problema, hazlo sentir más urgente, luego presenta la solución. Clásico del copywriting persuasivo.',
     ejemplo: '"¿Tu blog no genera tráfico? Es frustrante ver 0 visitas después de horas trabajando. Aquí está el sistema que lo cambia."',
     cuando: 'Artículos de problema/solución, landing pages, emails de venta.',
@@ -57,7 +85,7 @@ const COPY_FORMULAS = [
     name: '4P',
     full: 'Promise → Picture → Proof → Push',
     emoji: '💎',
-    color: '#06b6d4',
+    color: '#22d3ee',
     desc: 'Promesa → Imagen del resultado → Prueba social → Llamado final. Formula de alta conversión.',
     ejemplo: '"Aprende a monetizar tu blog en 90 días → imagina tener ingresos pasivos → [100 casos de éxito] → empieza hoy."',
     cuando: 'Ofertas de alto valor, contenido premium, lanzamientos.',
@@ -85,6 +113,8 @@ export default function SeoPage() {
   const [serpKeyword, setSerpKeyword] = useState('')
   const [serpLoading, setSerpLoading] = useState(false)
   const [serpResult, setSerpResult] = useState<{ organic: { title: string; link: string; snippet: string; position: number }[]; related: string[]; paa: string[]; demo?: boolean } | null>(null)
+
+  const densidadLive = useMemo(() => calcularDensidad(article, keyword), [article, keyword])
 
   useEffect(() => {
     const p = localStorage.getItem('blogos_profile')
@@ -166,7 +196,7 @@ Responde SOLO con JSON válido sin markdown ni texto adicional:
           <button key={t.id} onClick={() => setSeoTab(t.id as 'analisis' | 'google' | 'serpapi' | 'formulas')} style={{
             padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer',
             border: 'none', transition: 'all 0.2s',
-            background: seoTab === t.id ? 'linear-gradient(135deg, #7c3aed, #5b21b6)' : 'transparent',
+            background: seoTab === t.id ? 'linear-gradient(135deg, #6366f1, #4338ca)' : 'transparent',
             color: seoTab === t.id ? 'white' : 'var(--text-muted)',
           }}>{t.label}</button>
         ))}
@@ -179,11 +209,16 @@ Responde SOLO con JSON válido sin markdown ni texto adicional:
             <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 14 }}>
               🔍 Analizar artículo con IA
             </h2>
-            <div style={{ position: 'relative', marginBottom: 12 }}>
+            <div style={{ position: 'relative', marginBottom: 8 }}>
               <Search size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               <input className="input-field" placeholder="Keyword objetivo (ej: cómo monetizar un blog)"
                 value={keyword} onChange={e => setKeyword(e.target.value)} style={{ paddingLeft: 36 }} />
             </div>
+            {keyword && article && (
+              <div style={{ marginBottom: 12 }}>
+                <DensidadIndicador densidad={densidadLive} />
+              </div>
+            )}
             <textarea className="textarea-field" placeholder="Pega tu artículo completo aquí (título + contenido)..."
               value={article} onChange={e => setArticle(e.target.value)} style={{ minHeight: 140, marginBottom: 12 }} />
             {error && (
@@ -212,7 +247,7 @@ Responde SOLO con JSON válido sin markdown ni texto adicional:
                   </div>
                   <div style={{ flex: 1, display: 'flex', gap: 20, flexWrap: 'wrap' }}>
                     {[
-                      { label: 'Keyword', value: result.keyword, color: '#a78bfa' },
+                      { label: 'Keyword', value: result.keyword, color: '#6366f1' },
                       { label: 'Densidad KW', value: `${result.densidadKw}%`, color: result.densidadKw > 3 ? '#f87171' : '#34d399' },
                       { label: 'Legibilidad', value: result.legibilidad, color: 'var(--text)' },
                     ].map(m => (
@@ -312,7 +347,7 @@ Responde SOLO con JSON válido sin markdown ni texto adicional:
                 <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'center' }}>
                   <div>
                     <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Keyword</div>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: '#a78bfa' }}>{serperResult.keyword}</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: '#6366f1' }}>{serperResult.keyword}</div>
                   </div>
                   <div>
                     <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Dificultad</div>
@@ -342,8 +377,8 @@ Responde SOLO con JSON válido sin markdown ni texto adicional:
                     {serperResult.keywords_relacionadas.map(kw => (
                       <button key={kw} onClick={() => setKeyword(kw)} style={{
                         fontSize: 12, padding: '4px 12px', borderRadius: 20, cursor: 'pointer',
-                        background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(124,58,237,0.25)',
-                        color: '#a78bfa',
+                        background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.25)',
+                        color: '#6366f1',
                       }}>#{kw}</button>
                     ))}
                   </div>
@@ -361,8 +396,8 @@ Responde SOLO con JSON válido sin markdown ni texto adicional:
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                         <div style={{ flex: 1 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                            <span style={{ fontSize: 11, fontWeight: 800, color: '#a78bfa', background: 'rgba(124,58,237,0.15)', padding: '1px 6px', borderRadius: 4 }}>#{r.posicion}</span>
-                            <span style={{ fontSize: 13, fontWeight: 600, color: '#06b6d4' }}>{r.titulo}</span>
+                            <span style={{ fontSize: 11, fontWeight: 800, color: '#6366f1', background: 'rgba(99,102,241,0.15)', padding: '1px 6px', borderRadius: 4 }}>#{r.posicion}</span>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: '#22d3ee' }}>{r.titulo}</span>
                           </div>
                           <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5 }}>{r.snippet}</div>
                         </div>
